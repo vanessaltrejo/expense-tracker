@@ -16,7 +16,7 @@ import type {
 } from "./types.ts";
 
 /**
- * Translates between the rows of the "Mis gastos" Google Sheet and the app's types.
+ * Translates between the rows of each person's Google Sheet and the app's types.
  * The sheet uses Spanish labels and pesos; the app uses codes and centavos.
  */
 

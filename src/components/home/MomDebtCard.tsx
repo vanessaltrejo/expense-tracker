@@ -53,7 +53,7 @@ function describe(movement: Movement): string {
 
 /** What mom owes, item by item, with quick ways to add a new one or log a repayment. */
 export function MomDebtCard() {
-  const { data, dashboard, today, runAction } = useFinance();
+  const { data, dashboard, today, runAction, canEdit } = useFinance();
   const [mode, setMode] = useState<Mode>(null);
   const [amountText, setAmountText] = useState("");
   const [note, setNote] = useState("");
@@ -145,16 +145,18 @@ export function MomDebtCard() {
                     {isRepayment ? "−" : ""}
                     {formatMoney(movement.amount)}
                   </span>
-                  <button
-                    type="button"
-                    className="-my-2 min-h-11 px-1 text-xs text-ink-soft underline underline-offset-2"
-                    aria-label={`Quitar ${describe(movement)} de Deuda mami`}
-                    onClick={() =>
-                      void runAction("Quitado de Deuda mami", () => deleteMovement(movement))
-                    }
-                  >
-                    Quitar
-                  </button>
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      className="-my-2 min-h-11 px-1 text-xs text-ink-soft underline underline-offset-2"
+                      aria-label={`Quitar ${describe(movement)} de Deuda mami`}
+                      onClick={() =>
+                        void runAction("Quitado de Deuda mami", () => deleteMovement(movement))
+                      }
+                    >
+                      Quitar
+                    </button>
+                  ) : null}
                 </span>
               </li>
             );
@@ -162,7 +164,7 @@ export function MomDebtCard() {
         </ul>
       ) : null}
 
-      {mode ? (
+      {!canEdit ? null : mode ? (
         <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-xl bg-surface p-3">
           <AmountField
             label={mode === "newDebt" ? "¿Cuánto te debe?" : "¿Cuánto te regresó?"}

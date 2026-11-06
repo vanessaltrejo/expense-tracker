@@ -11,7 +11,7 @@ import {
 import { dateInMonth, formatDayHeader, getTodayInMexico } from "./dates.ts";
 import { getHistoryCategories, matchesKind } from "./history.ts";
 import { formatPeriodRange, getPeriodForDate, isInPeriod } from "./periods.ts";
-import { APP_PROFILES, getProfileById } from "./appProfiles.ts";
+import { APP_USERS, canEdit, findUserById, findUserByUsername, toSessionUser } from "./users.ts";
 import { getInitials } from "./profile.ts";
 import {
   getLedgerBalances,
@@ -163,16 +163,30 @@ describe("periods", () => {
   });
 });
 
-describe("app profiles", () => {
-  test("three profiles: the owner has the full app, the other two start without data", () => {
-    assert.deepEqual(APP_PROFILES.map((profile) => [profile.id, profile.role]), [
+describe("users", () => {
+  test("Vanessa and Francisco own their data; Mami only reads Vanessa's Sheet", () => {
+    assert.deepEqual(APP_USERS.map((user) => [user.id, user.role]), [
       ["vanessa", "owner"],
-      ["mama", "viewer"],
-      ["novio", "own"],
+      ["mami", "viewer"],
+      ["francisco", "owner"],
     ]);
-    assert.equal(getProfileById("vanessa")?.initials, "VT");
-    assert.equal(getProfileById("desconocido"), null);
-    assert.equal(getProfileById(null), null);
+    assert.equal(canEdit("owner"), true);
+    assert.equal(canEdit("viewer"), false);
+    assert.equal(findUserById("mami")?.sheetIdEnv, findUserById("vanessa")?.sheetIdEnv);
+    assert.notEqual(findUserById("francisco")?.sheetIdEnv, findUserById("vanessa")?.sheetIdEnv);
+  });
+
+  test("the username ignores uppercase and spaces, and unknown names find nobody", () => {
+    assert.equal(findUserByUsername("  Vanessa ")?.id, "vanessa");
+    assert.equal(findUserByUsername("desconocido"), null);
+    assert.equal(findUserByUsername(42), null);
+    assert.equal(findUserById(null), null);
+  });
+
+  test("the browser only learns the id, name, role and color", () => {
+    const vanessa = findUserById("vanessa");
+    assert.ok(vanessa);
+    assert.deepEqual(Object.keys(toSessionUser(vanessa)).sort(), ["id", "name", "role", "tone"]);
   });
 });
 

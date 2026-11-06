@@ -1,5 +1,4 @@
 import { generateExpectedCharges } from "@/domain/recurring";
-import type { Profile } from "@/domain/profile";
 import type {
   AppData,
   Cents,
@@ -25,7 +24,8 @@ function undoMovements(created: Movement[]): Undo {
   return () => repository.current.deleteMovements(created.map((item) => item.id));
 }
 
-export async function loadFinanceData(today: IsoDate): Promise<AppData> {
+/** Read-only viewers see the generated charges but never save them. */
+export async function loadFinanceData(today: IsoDate, canEdit: boolean): Promise<AppData> {
   const data = await repository.current.load();
   const charges = generateExpectedCharges(
     data.fixedExpenses,
@@ -35,7 +35,7 @@ export async function loadFinanceData(today: IsoDate): Promise<AppData> {
   // Only the new charges are saved: sending all of them would overwrite a status that
   // was changed in the sheet, such as a charge marked Omitido by hand.
   const created = charges.slice(data.expectedCharges.length);
-  if (created.length > 0) {
+  if (canEdit && created.length > 0) {
     await repository.current.addGeneratedCharges(created);
   }
   return { ...data, expectedCharges: charges };
@@ -181,10 +181,6 @@ export async function savePaymentPlan(plan: PaymentPlan): Promise<void> {
 }
 
 /** A JSON copy of everything, in case access to the device or the sheet is lost. */
-export async function getStoredProfile(): Promise<Profile | null> {
-  return repository.current.getProfile();
-}
-
 export async function exportBackup(): Promise<string> {
   const data = await repository.current.load();
   return JSON.stringify({ exportedAt: new Date().toISOString(), ...data }, null, 2);

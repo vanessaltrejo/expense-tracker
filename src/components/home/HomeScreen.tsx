@@ -82,7 +82,7 @@ function HeroBalance() {
 }
 
 export function HomeScreen() {
-  const { data, dashboard, today, runAction } = useFinance();
+  const { data, dashboard, today, runAction, canEdit } = useFinance();
   const { balances } = dashboard;
   const pending = data.movements.filter(
     (movement) => movement.dataKind !== "dummy" && movement.category === PENDING_CATEGORY,
@@ -94,25 +94,27 @@ export function HomeScreen() {
       <HeroBalance />
       <MomDebtCard />
 
-      <nav aria-label="Acciones rápidas" className="grid grid-cols-3 gap-2">
-        {QUICK_ACTIONS.map((action) => (
-          <Link
-            key={action.href}
-            href={action.href}
-            className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-2xl bg-surface p-2 text-center text-xs font-semibold active:opacity-80"
-          >
-            <span
-              aria-hidden="true"
-              className={`flex size-9 items-center justify-center rounded-full text-lg ${action.tone}`}
+      {canEdit ? (
+        <nav aria-label="Acciones rápidas" className="grid grid-cols-3 gap-2">
+          {QUICK_ACTIONS.map((action) => (
+            <Link
+              key={action.href}
+              href={action.href}
+              className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-2xl bg-surface p-2 text-center text-xs font-semibold active:opacity-80"
             >
-              {action.icon}
-            </span>
-            {action.label}
-          </Link>
-        ))}
-      </nav>
+              <span
+                aria-hidden="true"
+                className={`flex size-9 items-center justify-center rounded-full text-lg ${action.tone}`}
+              >
+                {action.icon}
+              </span>
+              {action.label}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
 
-      {pending.length > 0 ? (
+      {canEdit && pending.length > 0 ? (
         <section className="card bg-warning-soft">
           <h2 className="text-sm font-semibold text-warning">
             {pending.length === 1 ? "1 gasto por revisar" : `${pending.length} gastos por revisar`}
@@ -142,17 +144,19 @@ export function HomeScreen() {
               Está en Banorte, sin generar rendimiento.
             </p>
           </div>
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() =>
-              void runAction("Lo pasaste a la cajita", () =>
-                moveBanorteToCajita(balances.banorte, today),
-              )
-            }
-          >
-            Ya lo pasé a la cajita
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() =>
+                void runAction("Lo pasaste a la cajita", () =>
+                  moveBanorteToCajita(balances.banorte, today),
+                )
+              }
+            >
+              Ya lo pasé a la cajita
+            </button>
+          ) : null}
         </section>
       ) : null}
 

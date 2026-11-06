@@ -3,38 +3,34 @@
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 
-import { setActiveProfileId } from "@/services/activeProfile";
+import { forgetCachedUser } from "@/services/currentUser";
 import { useFinance } from "../FinanceProvider";
 import { SyncCard } from "../sync/SyncCard";
 import { Avatar } from "./Avatar";
 import { BackupCard } from "./BackupCard";
 
+async function leave() {
+  forgetCachedUser();
+  await signOut({ redirect: false });
+  // A full reload clears everything this person had in memory and shows the login.
+  window.location.reload();
+}
+
 export function ProfileScreen() {
-  const { profile, syncState } = useFinance();
-  const isConnected = syncState.status === "synced";
-  // The live session wins; the saved profile covers offline and signed-out moments.
-  const name = isConnected ? syncState.name : (profile?.name ?? null);
-  const email = isConnected ? syncState.email : (profile?.email ?? null);
+  const { user, canEdit } = useFinance();
 
   return (
     <>
       <h1 className="px-1 text-2xl font-semibold">Perfil</h1>
 
       <section className="card items-center gap-3 py-6 text-center">
-        <Avatar name={name ?? "?"} size={88} />
-        <div className="min-w-0">
-          <p className="text-xl font-semibold">{name ?? "Tu perfil"}</p>
-          <p className="mt-0.5 truncate text-sm text-ink-soft">
-            {email ?? "Conecta tu Google para ver tu nombre y tu correo."}
-          </p>
-        </div>
-        {isConnected ? (
-          <span className="pill bg-good-soft text-good">Conectado con Google</span>
-        ) : null}
+        <Avatar name={user.name} tone={user.tone} size={88} />
+        <p className="text-xl font-semibold">{user.name}</p>
+        {canEdit ? null : <span className="pill bg-muted-soft text-ink-soft">Solo lectura</span>}
       </section>
 
       <SyncCard />
-      <BackupCard />
+      {canEdit ? <BackupCard /> : null}
 
       <section className="card gap-0 py-1">
         <Link
@@ -56,21 +52,11 @@ export function ProfileScreen() {
 
       <button
         type="button"
-        className="btn-secondary min-h-12"
-        onClick={() => setActiveProfileId(null)}
+        className="btn-secondary min-h-12 text-danger"
+        onClick={() => void leave()}
       >
-        Cambiar de perfil
+        Cerrar sesión
       </button>
-
-      {isConnected ? (
-        <button
-          type="button"
-          className="btn-secondary min-h-12 text-danger"
-          onClick={() => void signOut({ redirectTo: "/perfil" })}
-        >
-          Cerrar sesión
-        </button>
-      ) : null}
     </>
   );
 }

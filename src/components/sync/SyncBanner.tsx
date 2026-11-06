@@ -11,7 +11,8 @@ export function SyncBanner() {
   if (!state) return null;
 
   let message: string | null = null;
-  if (state.status === "signedOut") message = "Conecta tu Google para guardar en tu Sheets";
+  if (state.status === "signedOut") message = "Tu sesión terminó, vuelve a entrar";
+  if (state.status === "notConfigured") message = "Tu Sheets todavía no está listo";
   if (state.status === "offline" && state.pending > 0) {
     message = `Sin internet · ${state.pending} ${state.pending === 1 ? "cambio" : "cambios"} por subir`;
   }

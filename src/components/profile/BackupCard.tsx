@@ -3,18 +3,18 @@
 import { exportBackup } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
 
-async function downloadBackup(today: string) {
+async function downloadBackup(today: string, userId: string) {
   const json = await exportBackup();
   const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = `mis-gastos-respaldo-${today}.json`;
+  link.download = `pockets-respaldo-${userId}-${today}.json`;
   link.click();
   URL.revokeObjectURL(url);
 }
 
 export function BackupCard() {
-  const { today } = useFinance();
+  const { today, user } = useFinance();
 
   return (
     <section className="card">
@@ -25,7 +25,7 @@ export function BackupCard() {
       <button
         type="button"
         className="btn-secondary min-h-12"
-        onClick={() => void downloadBackup(today)}
+        onClick={() => void downloadBackup(today, user.id)}
       >
         Descargar respaldo (JSON)
       </button>

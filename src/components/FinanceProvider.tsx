@@ -13,8 +13,9 @@ import {
 import { buildDashboard, type Dashboard } from "@/domain/dashboard";
 import { getTodayInMexico } from "@/domain/dates";
 import type { AppData, IsoDate } from "@/domain/types";
-import type { Profile } from "@/domain/profile";
-import { getStoredProfile, loadFinanceData, type Undo } from "@/services/financeService";
+import { canEdit as roleCanEdit, type SessionUser } from "@/domain/users";
+import { switchRepositoryTo } from "@/services/financeRepository";
+import { loadFinanceData, type Undo } from "@/services/financeService";
 import { type SyncState, syncWithSheet } from "@/services/syncService";
 
 interface Toast {
@@ -36,8 +37,10 @@ interface FinanceContextValue {
   dismissToast: () => void;
   syncState: SyncState;
   syncNow: () => Promise<void>;
-  /** Name and email from the last time Google was connected, kept for offline use. */
-  profile: Profile | null;
+  /** Who is signed in. */
+  user: SessionUser;
+  /** False for the read-only view: every change is refused, here and on the server. */
+  canEdit: boolean;
 }
 
 const FinanceContext = createContext<FinanceContextValue | null>(null);
@@ -48,37 +51,44 @@ const LoadStateContext = createContext<{
 
 const TOAST_DURATION_MS = 6_000;
 
-export function FinanceProvider({ children }: { children: ReactNode }) {
+export function FinanceProvider({
+  user,
+  children,
+}: {
+  user: SessionUser;
+  children: ReactNode;
+}) {
+  // Before anything reads or writes, point the storage at this person's own database.
+  switchRepositoryTo(user.id);
+  const canEdit = roleCanEdit(user.role);
   const [loaded, setLoaded] = useState<{ data: AppData; today: IsoDate } | null>(
     null,
   );
   const [loadFailed, setLoadFailed] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
   const [syncState, setSyncState] = useState<SyncState>({ status: "idle" });
-  const [profile, setProfile] = useState<Profile | null>(null);
 
   const refresh = useCallback(async () => {
     // "Today" comes from the device, so a server in another timezone can't change it.
     const today = getTodayInMexico();
     try {
-      const data = await loadFinanceData(today);
-      setProfile(await getStoredProfile());
+      const data = await loadFinanceData(today, canEdit);
       setLoaded({ data, today });
       setLoadFailed(false);
     } catch {
       setLoadFailed(true);
     }
-  }, []);
+  }, [canEdit]);
 
   /** Sends pending changes to the sheet and shows what the sheet has now. */
   const syncNow = useCallback(async () => {
     setSyncState((current) =>
       current.status === "synced" ? current : { status: "syncing" },
     );
-    const result = await syncWithSheet();
+    const result = await syncWithSheet(canEdit);
     setSyncState(result);
     if (result.status === "synced") await refresh();
-  }, [refresh]);
+  }, [refresh, canEdit]);
 
   useEffect(() => {
     const initialLoad = setTimeout(async () => {
@@ -109,6 +119,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const runAction = useCallback<FinanceContextValue["runAction"]>(
     async (message, action) => {
+      if (!canEdit) return;
       try {
         const undo = await action();
         await refresh();
@@ -118,7 +129,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         setToast({ message: "No se pudo guardar. Intenta de nuevo.", undo: null });
       }
     },
-    [refresh, syncNow],
+    [refresh, syncNow, canEdit],
   );
 
   const undoToast = useCallback(async () => {
@@ -143,9 +154,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       dismissToast,
       syncState,
       syncNow,
-      profile,
+      user,
+      canEdit,
     };
-  }, [loaded, toast, runAction, undoToast, dismissToast, syncState, syncNow, profile]);
+  }, [loaded, toast, runAction, undoToast, dismissToast, syncState, syncNow, user, canEdit]);
 
   const loadState = useMemo(
     () => ({ loadFailed, retry: refresh }),

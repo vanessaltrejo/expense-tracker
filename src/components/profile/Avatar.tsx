@@ -1,4 +1,4 @@
-import type { AvatarTone } from "@/domain/appProfiles";
+import type { AvatarTone } from "@/domain/users";
 import { getInitials } from "@/domain/profile";
 
 const TONES: Record<AvatarTone, string> = {

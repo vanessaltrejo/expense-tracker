@@ -9,7 +9,7 @@ import { useFinance } from "../FinanceProvider";
 import { STATUS_STYLES } from "../ui/styles";
 
 function ChargeRow({ charge }: { charge: ExpectedCharge }) {
-  const { data, today, runAction } = useFinance();
+  const { data, today, runAction, canEdit } = useFinance();
   const overdue = isOverdue(charge, today);
   const charges = data.expectedCharges;
 
@@ -33,30 +33,32 @@ function ChargeRow({ charge }: { charge: ExpectedCharge }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          className="btn-secondary"
-          onClick={() =>
-            void runAction(`${charge.name} ya se cobró`, () =>
-              confirmCharge(charge, charges, today),
-            )
-          }
-        >
-          Ya se cobró
-        </button>
-        <button
-          type="button"
-          className="btn-secondary"
-          onClick={() =>
-            void runAction(`${charge.name} omitido este mes`, () =>
-              skipCharge(charge, charges),
-            )
-          }
-        >
-          Omitir
-        </button>
-      </div>
+      {canEdit ? (
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() =>
+              void runAction(`${charge.name} ya se cobró`, () =>
+                confirmCharge(charge, charges, today),
+              )
+            }
+          >
+            Ya se cobró
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() =>
+              void runAction(`${charge.name} omitido este mes`, () =>
+                skipCharge(charge, charges),
+              )
+            }
+          >
+            Omitir
+          </button>
+        </div>
+      ) : null}
     </li>
   );
 }

@@ -13,9 +13,9 @@ export default function TermsPage() {
       </p>
       <p>
         La app no mueve dinero ni se conecta a tus bancos. Solo registra lo que tú escribes
-        y lo guarda en tu Google Sheets.
+        y lo guarda en el Google Sheets de cada persona.
       </p>
-      <p>Solo pueden entrar las cuentas autorizadas por la dueña de la app.</p>
+      <p>Solo pueden entrar las personas a las que la dueña de la app les dio usuario y contraseña.</p>
     </article>
   );
 }

@@ -20,7 +20,6 @@ import type {
 import { changeMovementCategory, deleteMovement } from "@/services/financeService";
 import { PENDING_CATEGORY } from "@/data/seedData";
 import { useFinance } from "../FinanceProvider";
-import { SHEET_URL } from "../sync/sheetUrl";
 import { PeriodBar } from "../ui/PeriodBar";
 import { formatCategory, getCategoryIcon, TYPE_STYLES } from "../ui/styles";
 
@@ -92,9 +91,10 @@ function MovementRow({
   movement: Movement;
   summaryOnly: boolean;
 }) {
-  const { data, runAction } = useFinance();
+  const { data, runAction, canEdit } = useFinance();
   const isDummy = movement.dataKind === "dummy";
-  const canChangeCategory = movement.type === "expense" || movement.type === "cardExpense";
+  const canChangeCategory =
+    canEdit && (movement.type === "expense" || movement.type === "cardExpense");
   const title = movement.note || movement.category || TYPE_LABELS[movement.type];
 
   return (
@@ -156,16 +156,18 @@ function MovementRow({
           {getSign(movement)}
           {formatMoney(movement.amount)}
         </p>
-        <button
-          type="button"
-          className="min-h-11 pl-3 text-sm text-ink-soft underline underline-offset-2"
-          aria-label={`Borrar ${title}`}
-          onClick={() =>
-            void runAction("Movimiento borrado", () => deleteMovement(movement))
-          }
-        >
-          Borrar
-        </button>
+        {canEdit ? (
+          <button
+            type="button"
+            className="min-h-11 pl-3 text-sm text-ink-soft underline underline-offset-2"
+            aria-label={`Borrar ${title}`}
+            onClick={() =>
+              void runAction("Movimiento borrado", () => deleteMovement(movement))
+            }
+          >
+            Borrar
+          </button>
+        ) : null}
       </div>
     </li>
   );
@@ -318,10 +320,6 @@ export function HistoryScreen() {
           ))}
         </section>
       ) : null}
-
-      <a href={SHEET_URL} target="_blank" rel="noreferrer" className="btn-secondary min-h-12">
-        Ver todo en Google Sheets
-      </a>
     </>
   );
 }

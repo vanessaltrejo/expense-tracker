@@ -2,20 +2,26 @@
 
 import type { ReactNode } from "react";
 
-import { ConnectScreen } from "./ConnectScreen";
 import { useLoadState, useOptionalFinance } from "./FinanceProvider";
 
 /**
  * Lives inside each page, so the navigation renders right away and is never held back
  * by data that only exists on the device.
  */
-export function FinanceGate({ children }: { children: ReactNode }) {
+export function FinanceGate({
+  children,
+  allowEmpty = false,
+}: {
+  children: ReactNode;
+  /** Perfil opens even without data, so there is always a way to sync or sign out. */
+  allowEmpty?: boolean;
+}) {
   const finance = useOptionalFinance();
   const { loadFailed, retry } = useLoadState();
 
   if (finance) {
-    const hasNoData = finance.data.movements.length === 0;
-    if (hasNoData && finance.syncState.status === "signedOut") return <ConnectScreen />;
+    const hasNoData = !allowEmpty && finance.data.movements.length === 0;
+    if (hasNoData && finance.syncState.status === "notConfigured") return <NotReadyMessage />;
     if (hasNoData && ["idle", "syncing"].includes(finance.syncState.status)) {
       return <LoadingMessage />;
     }
@@ -34,6 +40,17 @@ export function FinanceGate({ children }: { children: ReactNode }) {
   }
 
   return <LoadingMessage />;
+}
+
+function NotReadyMessage() {
+  return (
+    <section className="card items-center gap-2 py-8 text-center">
+      <h1 className="text-xl font-semibold">Tu espacio todavía no está listo</h1>
+      <p className="text-ink-soft">
+        Falta conectar tu Google Sheets con la app. En cuanto esté, tus datos aparecen aquí.
+      </p>
+    </section>
+  );
 }
 
 function LoadingMessage() {

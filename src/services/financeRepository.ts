@@ -1,14 +1,7 @@
 import Dexie, { type EntityTable, type Transaction } from "dexie";
 
-import {
-  emptyPaymentPlan,
-  seedFixedExpenses,
-  seedSettings,
-  seedShortcuts,
-  seedStatements,
-} from "@/data/seedData";
+import { emptyPaymentPlan, seedSettings } from "@/data/seedData";
 import { createId } from "@/domain/ids";
-import type { Profile } from "@/domain/profile";
 import type { SyncOp } from "@/domain/syncOps";
 import type {
   AppData,
@@ -42,8 +35,6 @@ export interface FinanceRepository {
   /** Replaces the local copy with the sheet, then re-applies changes not sent yet. */
   replaceWithSheet(data: AppData, sentSeqs: number[]): Promise<void>;
   getSyncInfo(): Promise<SyncInfo>;
-  getProfile(): Promise<Profile | null>;
-  saveProfile(profile: Profile): Promise<void>;
 }
 
 export interface PendingOp {
@@ -64,7 +55,6 @@ interface ConfigRow {
   nextShortcutId: number;
   linkedAt?: string | null;
   lastSyncedAt?: string | null;
-  profile?: Profile | null;
 }
 
 interface OutboxRow {
@@ -82,8 +72,8 @@ class FinanceDatabase extends Dexie {
   config!: EntityTable<ConfigRow, "id">;
   outbox!: EntityTable<OutboxRow, "seq">;
 
-  constructor() {
-    super("mis-gastos");
+  constructor(name: string) {
+    super(name);
     this.version(1).stores({
       movements: "id, date",
       fixedExpenses: "id",
@@ -92,8 +82,7 @@ class FinanceDatabase extends Dexie {
       shortcuts: "id",
       config: "id",
     });
-    // Version 2 brings new default categories and known shortcut prices to a database
-    // created earlier, without touching anything the user saved.
+    // Version 2 brought new default categories to a database created earlier.
     this.version(2).upgrade(async (tx) => {
       const config = tx.table<ConfigRow, string>("config");
       await config.toCollection().modify((row) => {
@@ -102,15 +91,6 @@ class FinanceDatabase extends Dexie {
         );
         row.settings.expenseCategories.push(...missing);
       });
-      const shortcuts = tx.table<Shortcut, string>("shortcuts");
-      for (const seed of seedShortcuts) {
-        await shortcuts
-          .where("id")
-          .equals(seed.id)
-          .modify((row) => {
-            if (row.amount === null && seed.amount !== null) row.amount = seed.amount;
-          });
-      }
     });
     // Version 3 adds the outbox: changes waiting to be written to the sheet.
     this.version(3).stores({ outbox: "++seq" });
@@ -128,32 +108,23 @@ const DATA_TABLES = [
 ] as const;
 
 class DexieFinanceRepository implements FinanceRepository {
-  private readonly db = new FinanceDatabase();
+  constructor(private readonly db: FinanceDatabase) {}
 
   private async getConfig(): Promise<ConfigRow> {
     const existing = await this.db.config.get("main");
     if (existing) return existing;
 
-    // First open on this device: load the real data from the proposal.
+    // First open on this device: default settings only. The real data comes from the Sheet.
     const config: ConfigRow = {
       id: "main",
       settings: seedSettings,
       paymentPlan: emptyPaymentPlan,
       nextMovementId: 1,
-      nextShortcutId: seedShortcuts.length + 1,
+      nextShortcutId: 1,
       linkedAt: null,
       lastSyncedAt: null,
     };
-    await this.db.transaction(
-      "rw",
-      [this.db.config, this.db.fixedExpenses, this.db.statements, this.db.shortcuts],
-      async () => {
-        await this.db.fixedExpenses.bulkPut(seedFixedExpenses);
-        await this.db.statements.bulkPut(seedStatements);
-        await this.db.shortcuts.bulkPut(seedShortcuts);
-        await this.db.config.put(config);
-      },
-    );
+    await this.db.config.put(config);
     return config;
   }
 
@@ -267,16 +238,6 @@ class DexieFinanceRepository implements FinanceRepository {
     return { linkedAt: config.linkedAt ?? null, lastSyncedAt: config.lastSyncedAt ?? null };
   }
 
-  async getProfile(): Promise<Profile | null> {
-    const config = await this.getConfig();
-    return config.profile ?? null;
-  }
-
-  async saveProfile(profile: Profile): Promise<void> {
-    await this.getConfig();
-    await this.db.config.update("main", { profile });
-  }
-
   async replaceWithSheet(data: AppData, sentSeqs: number[]): Promise<void> {
     const now = new Date().toISOString();
     await this.db.transaction("rw", DATA_TABLES, async (tx) => {
@@ -342,10 +303,29 @@ async function applyLocally(tx: Transaction, op: SyncOp): Promise<void> {
   }
 }
 
-let repository: DexieFinanceRepository | null = null;
+/**
+ * Each person has their own database on the device, so two people sharing a phone never
+ * see each other's copy. Vanessa keeps the name her data already had.
+ */
+function databaseName(userId: string): string {
+  return userId === "vanessa" ? "mis-gastos" : `pockets-${userId}`;
+}
+
+const repositories = new Map<string, DexieFinanceRepository>();
+let activeUserId: string | null = null;
+
+/** Called when someone signs in: from then on, every read and write uses their database. */
+export function switchRepositoryTo(userId: string): void {
+  activeUserId = userId;
+}
 
 /** Created on first use, because IndexedDB only exists in the browser, not on the server. */
 export function getFinanceRepository(): FinanceRepository {
-  repository ??= new DexieFinanceRepository();
+  if (!activeUserId) throw new Error("Nobody is signed in");
+  let repository = repositories.get(activeUserId);
+  if (!repository) {
+    repository = new DexieFinanceRepository(new FinanceDatabase(databaseName(activeUserId)));
+    repositories.set(activeUserId, repository);
+  }
   return repository;
 }

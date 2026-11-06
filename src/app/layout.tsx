@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 
-import { ProfileGate } from "@/components/profile/ProfileGate";
+import { AuthGate } from "@/components/profile/AuthGate";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,7 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="es-MX" className={`${geistSans.variable} antialiased`}>
       <body>
-        <ProfileGate>{children}</ProfileGate>
+        <AuthGate>{children}</AuthGate>
       </body>
     </html>
   );

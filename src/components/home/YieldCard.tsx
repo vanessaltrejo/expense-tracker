@@ -6,7 +6,7 @@ import { savePaymentPlan } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
 
 export function YieldCard() {
-  const { data, dashboard, today, runAction } = useFinance();
+  const { data, dashboard, today, runAction, canEdit } = useFinance();
   const { plan, card, balances } = dashboard;
 
   if (balances.cajita <= 0 && dashboard.yieldThisPeriod === 0) return null;
@@ -31,6 +31,7 @@ export function YieldCard() {
           className="field"
           type="date"
           min={today}
+          disabled={!canEdit}
           max={addDays(card.dueDate, -1)}
           value={plan.plannedDate}
           onChange={(event) => {

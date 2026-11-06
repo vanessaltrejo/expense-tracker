@@ -1,9 +1,6 @@
 "use client";
 
-import { signIn } from "next-auth/react";
-
 import { useFinance } from "../FinanceProvider";
-import { SHEET_URL } from "./sheetUrl";
 
 function formatTime(iso: string): string {
   return new Intl.DateTimeFormat("es-MX", { hour: "numeric", minute: "2-digit" }).format(
@@ -11,14 +8,16 @@ function formatTime(iso: string): string {
   );
 }
 
-/** Where the user connects Google, sees the last sync and any rows with mistakes. */
+/** The last sync, any rows with mistakes, and (for owners) a link to the Sheet. */
 export function SyncCard() {
-  const { syncState, syncNow } = useFinance();
+  const { syncState, syncNow, canEdit } = useFinance();
+  // Only owners receive the link from the server; the read-only view never gets it.
+  const sheetUrl = syncState.status === "synced" ? syncState.sheetUrl : null;
 
   return (
     <section id="cuenta" className="card">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="card-title">Tu Google Sheets</h2>
+        <h2 className="card-title">{canEdit ? "Tu Google Sheets" : "Google Sheets"}</h2>
         {syncState.status === "synced" ? (
           <p className="text-xs text-ink-soft">Sincronizado a las {formatTime(syncState.at)}</p>
         ) : null}
@@ -51,8 +50,15 @@ export function SyncCard() {
 
       {syncState.status === "signedOut" ? (
         <p className="text-sm text-ink-soft">
-          Conecta tu cuenta de Google para que todo se guarde en tu Sheets y lo veas en
-          cualquier dispositivo.
+          Tu sesión terminó. Cierra sesión y vuelve a entrar para seguir sincronizando.
+        </p>
+      ) : null}
+
+      {syncState.status === "notConfigured" ? (
+        <p className="text-sm text-ink-soft">
+          {canEdit
+            ? "Tu Sheets todavía no está listo. Lo que registres se queda guardado aquí."
+            : "Todavía no hay información para ver."}
         </p>
       ) : null}
 
@@ -67,30 +73,20 @@ export function SyncCard() {
         </p>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2">
-        {syncState.status === "signedOut" ? (
-          <button
-            type="button"
-            className="btn-primary col-span-2"
-            onClick={() => void signIn("google", { redirectTo: "/perfil" })}
-          >
-            Conectar con Google
-          </button>
-        ) : (
-          <>
-            <button
-              type="button"
-              className="btn-secondary min-h-12"
-              disabled={syncState.status === "syncing"}
-              onClick={() => void syncNow()}
-            >
-              Sincronizar ahora
-            </button>
-            <a href={SHEET_URL} target="_blank" rel="noreferrer" className="btn-secondary min-h-12">
-              Abrir el Sheets
-            </a>
-          </>
-        )}
+      <div className={`grid gap-2 ${sheetUrl ? "grid-cols-2" : "grid-cols-1"}`}>
+        <button
+          type="button"
+          className="btn-secondary min-h-12"
+          disabled={syncState.status === "syncing"}
+          onClick={() => void syncNow()}
+        >
+          Sincronizar ahora
+        </button>
+        {sheetUrl ? (
+          <a href={sheetUrl} target="_blank" rel="noreferrer" className="btn-secondary min-h-12">
+            Abrir el Sheets
+          </a>
+        ) : null}
       </div>
     </section>
   );

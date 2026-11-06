@@ -67,7 +67,7 @@ function AddMovementContent({ initialTab }: { initialTab: AddTab }) {
 
 /** Needs a Suspense boundary above it, because it reads the URL (?tipo=pago). */
 export function AddMovementScreen() {
-  const { today } = useFinance();
+  const { today, canEdit } = useFinance();
   const searchParams = useSearchParams();
   const [visit, setVisit] = useState(0);
   const requested = searchParams.get("tipo");
@@ -77,6 +77,14 @@ export function AddMovementScreen() {
   // moment. Starting over each visit keeps a saved amount from being registered twice,
   // and the `today` key keeps a form left open overnight from using yesterday's date.
   useEffect(() => () => setVisit((current) => current + 1), []);
+
+  if (!canEdit) {
+    return (
+      <p className="card text-center text-ink-soft">
+        Esta cuenta es de solo lectura: aquí no se agregan movimientos.
+      </p>
+    );
+  }
 
   return (
     <AddMovementContent

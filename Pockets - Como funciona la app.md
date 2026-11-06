@@ -14,7 +14,7 @@ Vanessa tiene su dinero repartido en varios lugares y casi todos sus gastos van 
 
 La idea que lo sostiene todo: **cada lugar donde hay dinero es una "bolsa"**, y la tarjeta es una **deuda**, no dinero. Con eso la app calcula, sin que nadie tenga que sumar a mano, cuánto se debe, cuánto hay y cuánto falta.
 
-Pockets es una **PWA** (una página web que se instala en el teléfono y se comporta como app), y usa **un Google Sheets como base de datos**. La dueña de los datos puede abrir su Sheets y ver o corregir todo.
+Pockets es una **PWA** (una página web que se instala en el teléfono y se comporta como app), y usa **Google Sheets como base de datos**: uno por persona, todos en la cuenta de la dueña, que puede abrirlos y ver o corregir todo.
 
 ---
 
@@ -206,21 +206,28 @@ La barra de abajo tiene cuatro destinos y un botón central **+**:
 - **Inicio:** descrita en la sección 4.
 - **Historial:** los movimientos **del periodo actual**, agrupados por día ("Viernes 6 nov"), como en Nu. Tiene filtros: Todo / Gastos / Ingresos, por **bolsa** y por **categoría** (las categorías cambian según el tipo). Se puede cambiar la categoría de un gasto directo en la lista, y "Borrar" un movimiento. Lo que es solo seguimiento de Deuda mami no se lista. Los movimientos anteriores a un saldo inicial se ven atenuados porque solo cuentan en el Resumen.
 - **Resumen:** del **periodo actual**: cuánto se gastó y en cuántos gastos, **en qué se gastó** (gráfica por categoría), los **gastos más grandes** y cuánto entró.
-- **Perfil:** nombre y correo, conexión con Google y su estado de sincronización ("Sincronizado a las 10:05"), **Sincronizar ahora**, **Abrir el Sheets**, **Respaldo** (descarga un JSON con todo), avisos de privacidad y términos, **Cambiar de perfil** y **Cerrar sesión**.
+- **Perfil:** nombre, estado de sincronización ("Sincronizado a las 10:05"), **Sincronizar ahora**, **Abrir el Sheets** y **Respaldo** (descarga un JSON con todo; ambos solo para quien puede editar), avisos de privacidad y términos, y **Cerrar sesión**.
 
 **Categorías:** comida, salidas, transporte, escuela, antojos, pareja, mamá, suscripciones, otros, pendiente y no sé. La categoría **pendiente** sirve para algo que se registra sin saber qué es: Inicio avisa "N gastos por revisar" para que se le ponga categoría después. En los ingresos: horno³, comedor, mamá y otros. Las listas viven en la pestaña Ajustes.
 
 ---
 
-## 13. Perfiles ("¿Quién está usando Pockets?")
+## 13. Usuarios: quién entra y qué puede hacer
 
-Al abrir la app aparece un selector con tres perfiles, como un servicio de streaming:
+Cada persona entra con **usuario y contraseña** y usa la app en su propio teléfono.
 
-- **Vanessa** (dueña): ve y edita todo.
-- **Mamá** (lectora): pensado para que vea la información en modo solo lectura. **Todavía no está habilitado**; hoy muestra una pantalla vacía.
-- **Novio** (propio): pensado como un espacio separado con sus propios datos. **Todavía no está configurado.**
+| Usuario | Qué ve | Qué puede hacer |
+| --- | --- | --- |
+| **Vanessa** (dueña) | Su propio Sheets | Todo |
+| **Mami** (solo lectura) | El Sheets de Vanessa | Solo mirar: no agrega, no borra, no abre el Sheets ni descarga respaldos |
+| **Francisco** | Su propio Sheets | Todo, en su espacio |
 
-Es un **selector, no un candado**: sirve para elegir qué espacio abrir. Cada persona tendrá sus datos en su propio Google Sheets. La elección vive solo en la pestaña del navegador (sessionStorage), así que al cerrar la app se vuelve a preguntar. Los tres círculos siempre se ven en una sola fila, sin importar el ancho del teléfono.
+- **Todos los Sheets viven en la cuenta de Google de Vanessa.** El de su novio se le comparte a su correo para que él también lo pueda abrir.
+- **El modo de solo lectura se aplica en el servidor**, no solo escondiendo botones: si llegara un cambio desde la cuenta de solo lectura, el servidor lo rechaza.
+- **Cada persona tiene su propia copia en el teléfono** (una base de datos local por usuario), así que si dos comparten un dispositivo, sus datos no se mezclan.
+- Si el Sheets de alguien todavía no está conectado, la app dice "Tu espacio todavía no está listo" y Perfil sigue abierto para sincronizar o cerrar sesión.
+
+> **Por qué usuario y contraseña y no Google:** así su mamá y su novio no necesitan cuenta de Google, y todos los datos quedan en la cuenta de Vanessa. El cambio sustituyó al selector de perfiles anterior, que no era un candado.
 
 ---
 
@@ -241,9 +248,9 @@ El Sheets **es la fuente de verdad**: la app escribe ahí cada cambio y lee lo q
 
 ### Pestañas de vista (solo para mirar)
 
-**Resumen del mes**, **Gastos fijos por mes** e **Ingresos por quincena**: se calculan solas con fórmulas y la app **nunca** escribe en ellas. Están protegidas contra edición accidental.
+**Resumen del periodo**, **Gastos fijos por periodo** e **Ingresos por quincena**: se calculan solas con fórmulas y la app **nunca** escribe en ellas. Están protegidas contra edición accidental.
 
-> **Nota honesta:** estas vistas del Sheets agrupan por **mes de calendario**, mientras que la app agrupa por **periodo de tarjeta** (22 al 21). Los saldos de bolsas en esas vistas sí coinciden con la app; los totales "del mes" pueden diferir de los "del periodo". Adaptar esas vistas a periodos es una mejora pendiente.
+> **Por qué agrupan por periodo y no por mes:** estas vistas usan los mismos periodos de tarjeta (del 22 al 21) que la app, así que los totales de "Este periodo" coinciden con la pantalla Resumen. El día de corte sale de la pestaña Ajustes: si cambia, las vistas se acomodan solas. Los resaltados de color (periodo actual en amarillo, anteriores en verde) también siguen el periodo. "Ingresos por quincena" no agrupa por periodo, sino por día de pago (14 y 29).
 
 ### Reglas para editar a mano
 
@@ -268,17 +275,17 @@ La app es **offline-first**: funciona sin internet y sincroniza cuando puede.
 5. **El Sheets gana**: lo que vuelve del Sheets reemplaza la copia del teléfono, pero los cambios que todavía no se habían subido se vuelven a aplicar encima (así nada se pierde si se hizo algo sin internet).
 6. Un cambio pendiente solo se descarta de la bandeja cuando el servidor confirmó que lo escribió.
 
-El servidor **valida cada cambio** que llega del navegador campo por campo antes de tocar el Sheets (nunca confía en lo que mande el teléfono). Un aviso delgado arriba indica cuando algo necesita atención: "Sin internet · 2 cambios por subir", "Conecta tu Google…" o "No se pudo sincronizar".
+El servidor **valida cada cambio** que llega del navegador campo por campo antes de tocar el Sheets (nunca confía en lo que mande el teléfono). Un aviso delgado arriba indica cuando algo necesita atención: "Sin internet · 2 cambios por subir", "Tu sesión terminó…", "Tu Sheets todavía no está listo" o "No se pudo sincronizar".
 
 ---
 
 ## 16. Cuentas, permisos y seguridad
 
-- **Inicio de sesión con Google** usando **Auth.js**. Se pide el permiso de Google Sheets y se entra con redirección completa (en iPhone las ventanas emergentes de inicio de sesión fallan dentro de una app instalada).
-- **Los tokens de Google viven solo en el servidor**, dentro de una cookie de sesión cifrada. El navegador nunca los ve. Se pide un **refresh token** para que el acceso se renueve solo y no haya que reconectar cada hora.
-- **Un solo correo autorizado:** una variable de entorno (`ALLOWED_EMAIL`) define quién puede entrar; cualquier otra cuenta de Google se rechaza.
-- El ID del Sheets y los secretos de Google van en **variables de entorno** (en Vercel), nunca en el código. El archivo `.env.example` lista las variables sin valores secretos.
-- Google muestra una pantalla de aviso al conectar porque es una app personal sin verificar; es normal.
+- **Usuario y contraseña** con **Auth.js**. Las contraseñas **nunca se guardan**: solo un hash con `scrypt` y una "sal" aleatoria, que no se puede revertir. Se crean con `npm run hash-password`, que pide la contraseña sin mostrarla y solo imprime el hash. La comparación se hace en tiempo constante.
+- **La sesión** es una cookie cifrada que solo guarda el id de la persona; el navegador no la puede leer (httpOnly). Quitar el hash de alguien de las variables de entorno cierra sus sesiones.
+- **Acceso al Sheets con una cuenta de servicio de Google:** un "robot" que solo ve los Sheets que se le comparten. Su llave privada vive **solo** en las variables de entorno del servidor (Vercel y `.env.local`), nunca en el código, en Git ni en el navegador. El servidor pide con ella permisos de una hora y los renueva solo.
+- **El ID de cada Sheets y los hashes** van en variables de entorno. El archivo `.env.example` lista los nombres de las variables, sin valores.
+- Cada pedido al servidor revisa quién es y qué puede hacer; el navegador solo conoce el nombre, el id, el rol y el color de quien entró.
 
 ---
 
@@ -292,7 +299,7 @@ La separación por capas es la decisión de arquitectura más importante:
 | --- | --- | --- |
 | `src/domain` | **Lógica pura**: libro de saldos, periodos, estado de la tarjeta, rendimiento, cobros esperados, mapeo de filas del Sheets, validación de cambios. Sin React ni red. | Es lo que más importa y lo más fácil de equivocarse. Al ser funciones puras se prueba rápido y con certeza. |
 | `src/services` | Repositorio (Dexie + bandeja de salida), acciones de la app, sincronización. | Separa "qué hace la app" de "dónde se guarda". |
-| `src/server` | Todo lo que corre solo en el servidor: acceso a Google, cliente de Sheets, lectura/escritura por pestaña. | Los permisos de Google nunca llegan al navegador. |
+| `src/server` | Todo lo que corre solo en el servidor: contraseñas, sesión, cuenta de servicio, cliente de Sheets, lectura/escritura por pestaña. | Las llaves y permisos nunca llegan al navegador. |
 | `src/components` | Pantallas y piezas visuales, por pantalla (`home`, `add`, `history`, `summary`, `profile`, `sync`, `ui`). | Interfaz sin lógica de negocio. |
 | `src/data` | Datos iniciales de ejemplo (categorías, atajos, gastos fijos). | Solo se usan la primera vez; nunca se escriben en el Sheets. |
 | `src/app` | Rutas (Inicio, Agregar, Historial, Resumen, Perfil, privacidad, términos), API de sesión y de sincronización, manifiesto e íconos. | Estructura estándar de Next.js. |
@@ -310,7 +317,7 @@ npm run lint       # estilo
 npm run build      # versión de producción
 ```
 
-Para conectar con Google en local hace falta un archivo `.env.local` con las variables de `.env.example` (el ID del Sheets, el correo autorizado, `AUTH_SECRET` y las credenciales de Google Cloud).
+Para correrla en local hace falta un archivo `.env.local` con las variables de `.env.example`: `AUTH_SECRET`, la llave de la cuenta de servicio, el ID de cada Sheets y el hash de cada contraseña.
 
 **Instalarla en iPhone:** abrir la dirección de Vercel en Safari → Compartir → "Agregar a pantalla de inicio". El manifiesto (`manifest.ts`) le da nombre, íconos y colores, y la abre a pantalla completa.
 
@@ -332,7 +339,8 @@ Para conectar con Google en local hace falta un archivo `.env.local` con las var
 | Uñas como gasto recurrente cada 3 semanas | **Atajo de gasto normal** | No tienen día fijo; el recordatorio sobraba. |
 | Cambiar el monto de un cobro "solo este mes" | **Eliminado** | Poco usado; si cambia el precio, se edita el gasto fijo. |
 | "Cajita Turbo" y "Tarjeta Nu" | **Cajita Nu Débito** y **Tarjeta Nu crédito** | Nombres más claros. |
-| 4 pantallas | 4 pantallas + **Perfil** y selector de perfiles | Conexión con Google, respaldo y cambio de perfil. |
+| 4 pantallas | 4 pantallas + **Perfil** | Sincronización, respaldo y cerrar sesión. |
+| Entrar con Google | **Usuario y contraseña** por persona, Sheets por persona, mamá en solo lectura | Que la familia la use sin cuentas de Google y con todo en la cuenta de Vanessa. |
 | Gasto fijo "cada N días" en el Sheets | **Solo Mensual o Anual** | Sin uñas recurrentes ya no se usaba. |
 | Atajos enlazados a un gasto fijo | **Atajos simples** | Estaban ligados a las uñas recurrentes. |
 | Avisos (push, quincena, pagar tarjeta) | **No construidos todavía** | Quedan como mejora futura; hoy hay un aviso de sincronización y el de "gastos por revisar". |
@@ -343,12 +351,8 @@ Para conectar con Google en local hace falta un archivo `.env.local` con las var
 
 ## 19. Lo que falta o se puede mejorar
 
-- **Perfil de Mamá** en solo lectura y **espacio propio del Novio**, con nombres reales. Hoy son pantallas vacías.
-- Un **PIN** opcional para el perfil de la dueña.
 - **Ver periodos anteriores** en Inicio, Historial y Resumen.
 - **Service worker** para que la app abra aunque no haya internet, y **avisos** (pagar la tarjeta, quincena, próximos cobros) con notificaciones push.
-- Que las vistas del Sheets (Resumen del mes, etc.) usen **periodos de tarjeta** en lugar de meses de calendario.
-- Un botón "Ver todo en Google Sheets" más visible desde el Historial para movimientos muy viejos.
 
 ---
 
@@ -361,6 +365,6 @@ Para conectar con Google en local hace falta un archivo `.env.local` con las var
 5. **Cada acción tiene un solo lugar:** pagar la tarjeta, mover dinero, apuntar lo de mamá, ingresos. Menos pasos, menos confusión.
 6. **La mamá nunca paga directo:** Vanessa paga y ella regresa; lo extra es un ingreso a Banorte.
 7. **Offline-first con "el Sheets gana":** nada se pierde sin internet y los conflictos tienen una regla clara.
-8. **Seguridad en el servidor:** los tokens de Google nunca llegan al navegador y cada cambio se valida.
+8. **Seguridad en el servidor:** contraseñas solo como hash, llaves solo en el servidor, permisos revisados en cada pedido y cada cambio validado.
 9. **Lógica pura y probada**, separada de la interfaz y de dónde se guardan los datos.
 10. **Si no se usa, no se deja:** la app y el Sheets se mantienen limpios y con los mismos nombres y la misma estructura.

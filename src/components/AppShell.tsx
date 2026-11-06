@@ -126,6 +126,7 @@ function ToastBar() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const canEdit = useOptionalFinance()?.canEdit ?? false;
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
@@ -150,25 +151,27 @@ export function AppShell({ children }: { children: ReactNode }) {
           {leftItems.map((item) => (
             <NavLink key={item.href} item={item} active={pathname === item.href} />
           ))}
-          <Link
-            href="/agregar"
-            aria-label="Agregar movimiento"
-            aria-current={pathname === "/agregar" ? "page" : undefined}
-            className="mx-2 flex size-14 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink shadow-md active:scale-95"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              width="28"
-              height="28"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.25"
-              strokeLinecap="round"
-              aria-hidden="true"
+          {canEdit ? (
+            <Link
+              href="/agregar"
+              aria-label="Agregar movimiento"
+              aria-current={pathname === "/agregar" ? "page" : undefined}
+              className="mx-2 flex size-14 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink shadow-md active:scale-95"
             >
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </Link>
+              <svg
+                viewBox="0 0 24 24"
+                width="28"
+                height="28"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.25"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </Link>
+          ) : null}
           {rightItems.map((item) => (
             <NavLink key={item.href} item={item} active={pathname === item.href} />
           ))}

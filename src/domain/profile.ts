@@ -1,8 +1,3 @@
-export interface Profile {
-  name: string;
-  email: string;
-}
-
 /** First letter of the first and last words, like "VT" for "Vanessa Trejo". */
 export function getInitials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);

@@ -1,39 +1,34 @@
 import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
+import Credentials from "next-auth/providers/credentials";
 
-import { isAllowedEmail } from "@/server/allowedEmail";
-
-export const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
+import { findUserByUsername } from "@/domain/users";
+import { verifyPassword } from "@/server/passwords";
 
 /**
- * Google sign-in with Auth.js. The Google tokens live only inside the encrypted session
- * cookie and are read on the server; the browser never sees them.
+ * Username and password sign-in with Auth.js. The password is checked against a hash kept
+ * in an environment variable; the session is an encrypted cookie that only holds the
+ * user's id, never the password.
  */
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, signIn, signOut } = NextAuth({
   providers: [
-    Google({
-      authorization: {
-        params: {
-          scope: `openid email profile ${SHEETS_SCOPE}`,
-          // "offline" + "consent" make Google return a refresh token, so access renews
-          // by itself instead of asking to reconnect every hour.
-          access_type: "offline",
-          prompt: "consent",
-        },
+    Credentials({
+      credentials: {
+        username: { label: "Usuario" },
+        password: { label: "Contraseña", type: "password" },
+      },
+      authorize(credentials) {
+        const user = findUserByUsername(credentials.username);
+        const password = credentials.password;
+        if (!user || typeof password !== "string") return null;
+        if (!verifyPassword(password, process.env[user.passwordHashEnv])) return null;
+        return { id: user.id, name: user.name };
       },
     }),
   ],
   session: { strategy: "jwt" },
   callbacks: {
-    signIn({ profile }) {
-      return isAllowedEmail(profile?.email);
-    },
-    jwt({ token, account }) {
-      if (account) {
-        token.googleAccessToken = account.access_token;
-        token.googleRefreshToken = account.refresh_token;
-        token.googleExpiresAt = account.expires_at;
-      }
+    jwt({ token, user }) {
+      if (user?.id) token.userId = user.id;
       return token;
     },
   },
