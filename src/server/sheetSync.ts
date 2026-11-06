@@ -139,6 +139,20 @@ async function upsertRows(
   await client.appendRows(`${quote(tab)}!A:${LAST_COLUMN[tab]}`, appends);
 }
 
+/** Appends only the rows whose ID isn't in the sheet yet. Existing rows are never touched. */
+async function addMissingRows(
+  client: SheetsClient,
+  tab: TabName,
+  items: { id: string; row: Cell[] }[],
+): Promise<void> {
+  const rowNumbers = await readRowNumbersById(client, tab);
+  const missing = items.filter((item) => !rowNumbers.has(item.id));
+  await client.appendRows(
+    `${quote(tab)}!A:${LAST_COLUMN[tab]}`,
+    missing.map((item) => item.row),
+  );
+}
+
 async function deleteRowsById(
   client: SheetsClient,
   tab: TabName,
@@ -177,6 +191,13 @@ export async function applyOps(client: SheetsClient, ops: SyncOp[]): Promise<voi
         break;
       case "upsertExpectedCharges":
         await upsertRows(
+          client,
+          TAB.expectedCharges,
+          op.charges.map((charge) => ({ id: charge.id, row: expectedChargeToRow(charge) })),
+        );
+        break;
+      case "addExpectedCharges":
+        await addMissingRows(
           client,
           TAB.expectedCharges,
           op.charges.map((charge) => ({ id: charge.id, row: expectedChargeToRow(charge) })),

@@ -160,4 +160,10 @@ describe("sync requests", () => {
     assert.equal(parseSyncOps([{ kind: "dropTable" }]), null);
     assert.equal(parseSyncOps("hola"), null);
   });
+
+  test("generated charges travel as add-only, separate from charges the user changed", () => {
+    const charge = { id: "spotify:2026-11-05", fixedExpenseId: "spotify", name: "Spotify Premium", date: "2026-11-05", amount: 7_400, category: "suscripciones", status: "expected" };
+    const ops = parseSyncOps([{ kind: "addExpectedCharges", charges: [charge] }]);
+    assert.equal(ops?.[0]?.kind, "addExpectedCharges");
+  });
 });

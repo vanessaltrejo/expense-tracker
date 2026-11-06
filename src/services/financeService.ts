@@ -44,7 +44,7 @@ export async function loadFinanceData(today: IsoDate): Promise<AppData> {
   // was changed in the sheet, such as a charge marked Omitido by hand.
   const created = charges.slice(data.expectedCharges.length);
   if (created.length > 0) {
-    await repository.current.saveExpectedCharges(created);
+    await repository.current.addGeneratedCharges(created);
   }
   return { ...data, expectedCharges: charges };
 }

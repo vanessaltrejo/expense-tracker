@@ -32,6 +32,8 @@ export interface FinanceRepository {
   deleteMovements(ids: string[]): Promise<void>;
   updateMovement(movement: Movement): Promise<void>;
   saveExpectedCharges(charges: ExpectedCharge[]): Promise<void>;
+  /** For charges the app generated: never overwrites one the sheet already has. */
+  addGeneratedCharges(charges: ExpectedCharge[]): Promise<void>;
   saveFixedExpense(expense: FixedExpense): Promise<void>;
   saveShortcut(shortcut: Omit<Shortcut, "id"> & { id?: string }): Promise<Shortcut>;
   deleteShortcut(id: string): Promise<void>;
@@ -219,6 +221,13 @@ class DexieFinanceRepository implements FinanceRepository {
     });
   }
 
+  async addGeneratedCharges(charges: ExpectedCharge[]): Promise<void> {
+    await this.change(async () => {
+      await this.db.expectedCharges.bulkPut(charges);
+      return { kind: "addExpectedCharges", charges };
+    });
+  }
+
   async saveFixedExpense(expense: FixedExpense): Promise<void> {
     await this.change(async () => {
       await this.db.fixedExpenses.put(expense);
@@ -308,6 +317,13 @@ async function applyLocally(tx: Transaction, op: SyncOp): Promise<void> {
     case "upsertExpectedCharges":
       await tx.table<ExpectedCharge, string>("expectedCharges").bulkPut(op.charges);
       break;
+    case "addExpectedCharges": {
+      // Same rule as the sheet: only fill in charges that aren't there yet.
+      const table = tx.table<ExpectedCharge, string>("expectedCharges");
+      const existing = new Set(await table.toCollection().primaryKeys());
+      await table.bulkPut(op.charges.filter((charge) => !existing.has(charge.id)));
+      break;
+    }
     case "upsertFixedExpense":
       await tx.table<FixedExpense, string>("fixedExpenses").put(op.expense);
       break;
