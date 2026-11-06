@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+/*
+ * Color system: one hue per job, always the same everywhere.
+ * Pockets: cajita violet, banorte rose, efectivo green, por cobrar amber, tarjeta blue.
+ * Status: expected amber, charged green, skipped gray, overdue red (same as the sheet).
+ */
+:root {
+  color-scheme: light;
+  --surface: #ffffff;
+  --page: #f4f3ef;
+  --ink: #1a1a18;
+  --ink-soft: #5f5e59;
+  --line: #e2e0d9;
+  --accent: #1f66c1;
+  --accent-ink: #ffffff;
+  --accent-soft: #e6eefa;
+  --danger: #b3261e;
+  --danger-soft: #fbeaea;
+  --good: #0b6e4f;
+  --good-soft: #e3f4ec;
+  --warning: #8a5a00;
+  --warning-soft: #fdf1d8;
+  --muted-soft: #ecebe6;
+  --hero-from: #1f4fa8;
+  --hero-to: #6247c9;
+
+  --cajita: #6d4ed8;
+  --cajita-soft: #efeafd;
+  --banorte: #c2416b;
+  --banorte-soft: #fbe9ef;
+  --efectivo: #1f8a4c;
+  --efectivo-soft: #e5f5eb;
+  --cobrar: #a86400;
+  --cobrar-soft: #fdf1dc;
+  --tarjeta: #1f66c1;
+  --tarjeta-soft: #e6eefa;
+
+  --chart-current: #2a78d6;
+  --chart-previous: #eb6834;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --surface: #1d1d1b;
+    --page: #111110;
+    --ink: #f0efec;
+    --ink-soft: #b1afa6;
+    --line: #34332f;
+    --accent: #5a9bea;
+    --accent-ink: #0e1a2b;
+    --accent-soft: #1b2a3f;
+    --danger: #f2978f;
+    --danger-soft: #3a1d1b;
+    --good: #5fcfa5;
+    --good-soft: #15302a;
+    --warning: #f0c060;
+    --warning-soft: #362a0e;
+    --muted-soft: #2a2a27;
+    --hero-from: #1c3f85;
+    --hero-to: #4a3699;
+
+    --cajita: #a590f2;
+    --cajita-soft: #29223f;
+    --banorte: #ef8fae;
+    --banorte-soft: #3a1f29;
+    --efectivo: #6fd39a;
+    --efectivo-soft: #17301f;
+    --cobrar: #f0b45a;
+    --cobrar-soft: #3a2a10;
+    --tarjeta: #5a9bea;
+    --tarjeta-soft: #1b2a3f;
+
+    --chart-current: #3987e5;
+    --chart-previous: #d95926;
+  }
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-page: var(--page);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-muted-soft: var(--muted-soft);
+  --color-hero-from: var(--hero-from);
+  --color-hero-to: var(--hero-to);
+  --color-cajita: var(--cajita);
+  --color-cajita-soft: var(--cajita-soft);
+  --color-banorte: var(--banorte);
+  --color-banorte-soft: var(--banorte-soft);
+  --color-efectivo: var(--efectivo);
+  --color-efectivo-soft: var(--efectivo-soft);
+  --color-cobrar: var(--cobrar);
+  --color-cobrar-soft: var(--cobrar-soft);
+  --color-tarjeta: var(--tarjeta);
+  --color-tarjeta-soft: var(--tarjeta-soft);
+  --color-chart-current: var(--chart-current);
+  --color-chart-previous: var(--chart-previous);
+  --font-sans: var(--font-geist-sans);
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  .card {
+    @apply flex flex-col gap-3 rounded-2xl bg-surface p-4;
+  }
+
+  .card-title {
+    @apply text-sm font-medium text-ink-soft;
+  }
+
+  .amount {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 16px text stops iOS Safari from zooming in when a field gets focus. */
+  .field {
+    @apply min-h-12 w-full min-w-0 appearance-none rounded-xl border border-line bg-page px-3 text-base text-ink;
+  }
+
+  .field-label {
+    @apply flex min-w-0 flex-col gap-1.5 text-sm font-medium text-ink-soft;
+  }
+
+  .btn-primary {
+    @apply flex min-h-12 items-center justify-center rounded-xl bg-accent px-4 font-semibold text-accent-ink active:opacity-85 disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply flex min-h-11 items-center justify-center rounded-xl border border-line px-3 text-sm font-semibold text-ink active:bg-page disabled:opacity-50;
+  }
+
+  .chip {
+    @apply flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-line px-4 text-sm font-medium text-ink;
+  }
+
+  .chip[aria-pressed="true"],
+  .chip[aria-checked="true"] {
+    @apply border-accent bg-accent-soft font-semibold text-accent;
+  }
+
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold;
+  }
+}
