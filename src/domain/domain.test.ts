@@ -2,12 +2,19 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
 import { getCardStatus, getCutForDate, getDueDateForCut } from "./billing.ts";
-import { buildDashboard, buildMonthlySummary, estimateYield } from "./dashboard.ts";
-import { dateInMonth, getTodayInMexico } from "./dates.ts";
+import {
+  buildDashboard,
+  buildMonthlySummary,
+  estimateYield,
+  getYieldEarnedInMonth,
+} from "./dashboard.ts";
+import { dateInMonth, formatDayHeader, getTodayInMexico } from "./dates.ts";
+import { getHistoryCategories, matchesKind } from "./history.ts";
 import {
   buildPaymentMovements,
   buildYieldAdjustment,
   getLedgerBalances,
+  isMomDebtEntry,
   OPENING_BALANCE_CATEGORY,
 } from "./ledger.ts";
 import { parseMoneyInput, pesos } from "./money.ts";
@@ -112,17 +119,26 @@ const fixedExpenses: FixedExpense[] = [
   },
 ];
 
-function appData(movements: Movement[], today = "2026-11-03"): AppData {
+/** Most tests use a 0% cajita so balances are plain sums; the yield tests pass 0.13. */
+function appData(movements: Movement[], today = "2026-11-03", cajitaRate = 0): AppData {
   return {
     movements,
     fixedExpenses,
     expectedCharges: generateExpectedCharges(fixedExpenses, [], today),
     statements: [],
     shortcuts: [],
-    settings,
+    settings: { ...settings, annualYieldRate: cajitaRate },
     paymentPlan: { fromCajita: 0, fromCash: 0, momGift: 0, plannedDate: null },
   };
 }
+
+describe("day headers", () => {
+  test("read like Nu: weekday, day and short month", () => {
+    assert.equal(formatDayHeader("2026-11-05"), "Jueves 5 nov");
+    assert.equal(formatDayHeader("2026-10-22"), "Jueves 22 oct");
+    assert.equal(formatDayHeader("2026-11-01"), "Domingo 1 nov");
+  });
+});
 
 describe("money", () => {
   test("reads typed amounts exactly", () => {
@@ -229,14 +245,66 @@ test("Vanessa's real case: 7,534 still to cover and -2,534 free", () => {
   assert.equal(dashboard.free, pesos(-2_534));
 });
 
-test("prior rows count in the summary but never in balances", () => {
+test("card debt and Deuda mami come from movements, with no opening balance", () => {
   const movements = [
     opening("cajita", 1_000),
-    opening("tarjetaNu", 99),
-    row({ date: "2026-11-05", type: "cardExpense", amount: pesos(99), from: "tarjetaNu", category: "comida", dataKind: "prior" }),
+    row({ date: "2026-10-22", type: "cardExpense", amount: pesos(5_000), from: "tarjetaNu", category: "escuela", note: "Viaje EGS" }),
+    row({ date: "2026-10-23", type: "cardExpense", amount: pesos(156.1), from: "tarjetaNu", category: "escuela" }),
+    row({ date: "2026-10-22", type: "adjustment", amount: pesos(5_000), to: "porCobrarMama", category: "Deuda mami", note: "Viaje EGS" }),
   ];
-  assert.equal(buildDashboard(appData(movements), "2026-11-05").debt, pesos(99));
-  assert.equal(buildMonthlySummary(appData(movements), "2026-11-05").categories[0].thisMonth, pesos(99));
+  const dashboard = buildDashboard(appData(movements), "2026-11-05");
+  assert.equal(dashboard.debt, pesos(5_156.1));
+  assert.equal(dashboard.balances.porCobrarMama, pesos(5_000));
+  // The charges still count in the summary of their own month.
+  assert.equal(buildMonthlySummary(appData(movements), "2026-11-05").categories[0].lastMonth, pesos(5_156.1));
+});
+
+test("Deuda mami bookkeeping stays out of the history, real money moves don't", () => {
+  const bookkeeping = row({ date: "2026-10-22", type: "adjustment", amount: pesos(5_000), to: "porCobrarMama", category: "Deuda mami", note: "Viaje EGS" });
+  const lentWithCard = row({ date: "2026-11-05", type: "transfer", amount: pesos(200), from: "tarjetaNu", to: "porCobrarMama" });
+  const repayment = row({ date: "2026-11-05", type: "transfer", amount: pesos(200), from: "porCobrarMama", to: "efectivo" });
+  assert.equal(isMomDebtEntry(bookkeeping), true);
+  assert.equal(isMomDebtEntry(lentWithCard), false);
+  assert.equal(isMomDebtEntry(repayment), false);
+});
+
+describe("history filters", () => {
+  const spending = row({ date: "2026-11-02", type: "cardExpense", amount: pesos(99), from: "tarjetaNu", category: "comida" });
+  const income = row({ date: "2026-11-03", type: "income", amount: pesos(1_200), to: "banorte", category: "comedor" });
+  const opening1 = opening("cajita", 1_000);
+  const momEntry = row({ date: "2026-10-22", type: "adjustment", amount: pesos(5_000), to: "porCobrarMama", category: "Deuda mami" });
+  const repayment = row({ date: "2026-11-05", type: "transfer", amount: pesos(500), from: "porCobrarMama", to: "banorte" });
+
+  test("categories come only from real spending and income, split in two", () => {
+    const categories = getHistoryCategories([spending, income, opening1, momEntry, repayment]);
+    assert.deepEqual(categories.expenses, ["comida"]);
+    assert.deepEqual(categories.income, ["comedor"]);
+  });
+
+  test("the Gastos and Ingresos switch keeps transfers and adjustments out", () => {
+    assert.equal(matchesKind(spending, "expenses"), true);
+    assert.equal(matchesKind(income, "expenses"), false);
+    assert.equal(matchesKind(income, "income"), true);
+    assert.equal(matchesKind(repayment, "income"), false);
+    assert.equal(matchesKind(repayment, "all"), true);
+  });
+
+  test("what mom pays back lands in Banorte and then moves on to the cajita", () => {
+    const movements = [
+      opening("cajita", 1_000),
+      opening("banorte", 0),
+      row({ date: "2026-10-22", type: "adjustment", amount: pesos(5_000), to: "porCobrarMama", category: "Deuda mami" }),
+      row({ date: "2026-11-05", type: "transfer", amount: pesos(5_000), from: "porCobrarMama", to: "banorte" }),
+    ];
+    let balances = getLedgerBalances(movements, "2026-11-05");
+    assert.equal(balances.banorte, pesos(5_000));
+    assert.equal(balances.porCobrarMama, 0);
+
+    movements.push(row({ date: "2026-11-06", type: "transfer", amount: pesos(5_000), from: "banorte", to: "cajita" }));
+    balances = getLedgerBalances(movements, "2026-11-06");
+    assert.equal(balances.banorte, 0);
+    assert.equal(balances.cajita, pesos(6_000));
+  });
 });
 
 describe("card payments", () => {
@@ -315,12 +383,14 @@ describe("card payments", () => {
 });
 
 describe("expected charges", () => {
-  test("November matches the proposal: 654 expected, 474 on Dec 1 and 180 on Jan 1", () => {
+  test("only charges up to the next cut show: Spotify and Claude Pro, not iCloud on the 27th", () => {
     const dashboard = buildDashboard(appData([opening("cajita", 10_000)]), "2026-11-03");
-    assert.equal(dashboard.expectedThisMonth, pesos(654));
-    assert.equal(dashboard.freeAfterExpected, pesos(10_000 - 654));
+    assert.equal(dashboard.expectedThisPeriod, pesos(474));
+    assert.deepEqual(
+      dashboard.upcomingCharges.map((charge) => charge.name),
+      ["Spotify Premium", "Claude Pro"],
+    );
     assert.equal(dashboard.projectedDue, pesos(474));
-    assert.equal(dashboard.projectedNext, pesos(180));
     assert.equal(dashboard.card.dueDate, "2026-12-01");
   });
 
@@ -346,7 +416,18 @@ describe("expected charges", () => {
         charge.id === "claude:2026-11-18" ? { ...charge, status: "skipped" } : charge,
       ),
     };
-    assert.equal(buildDashboard(skipped, "2026-11-03").expectedThisMonth, pesos(254));
+    assert.equal(buildDashboard(skipped, "2026-11-03").expectedThisPeriod, pesos(74));
+  });
+
+  test("after the cut, the next period's charges appear, including iCloud", () => {
+    const data = appData([opening("cajita", 1_000)], "2026-11-23");
+    const dashboard = buildDashboard(data, "2026-11-23");
+    // The unconfirmed November ones stay (overdue); the new period adds iCloud, Spotify and
+    // Claude of December. January's charges are still out of the period.
+    assert.deepEqual(
+      dashboard.upcomingCharges.map((charge) => charge.date),
+      ["2026-11-05", "2026-11-18", "2026-11-27", "2026-12-05", "2026-12-18"],
+    );
   });
 
   test("an end date stops future charges and yearly ones only appear in their month", () => {
@@ -369,16 +450,59 @@ describe("expected charges", () => {
 });
 
 describe("yield", () => {
-  test("matches the table in the proposal", () => {
+  test("the estimate compounds daily, a few centavos above the simple interest table", () => {
     assert.equal(estimateYield(pesos(100), 0.13, 10), 36);
-    assert.equal(estimateYield(pesos(5_000), 0.13, 10), 1_781);
-    assert.equal(estimateYield(pesos(20_000), 0.13, 10), 7_123);
+    assert.equal(estimateYield(pesos(5_000), 0.13, 10), 1_784);
+    assert.equal(estimateYield(pesos(20_000), 0.13, 10), 7_135);
   });
 
-  test("defaults to the day before the due date and recalculates when money moves", () => {
-    const dashboard = buildDashboard(appData([opening("cajita", 20_000)]), "2026-11-20");
+  test("the cajita balance grows by itself every day", () => {
+    const movements = [opening("cajita", 10_000, "2026-11-01")];
+    const day0 = getLedgerBalances(movements, "2026-11-01", 0.13).cajita;
+    const day30 = getLedgerBalances(movements, "2026-12-01", 0.13).cajita;
+    assert.equal(day0, pesos(10_000));
+    assert.equal(day30, 1_010_740);
+    // Without a rate, nothing grows.
+    assert.equal(getLedgerBalances(movements, "2026-12-01").cajita, pesos(10_000));
+  });
+
+  test("money added later earns only from the day it arrives", () => {
+    const movements = [
+      opening("cajita", 10_000, "2026-11-01"),
+      row({ date: "2026-11-11", type: "transfer", amount: pesos(5_000), from: "banorte", to: "cajita" }),
+    ];
+    assert.equal(getLedgerBalances(movements, "2026-12-01", 0.13).cajita, 1_514_314);
+  });
+
+  test("tomorrow's balance is a little higher, not lower", () => {
+    const movements = [opening("cajita", 3_664, "2026-11-05")];
+    const today = getLedgerBalances(movements, "2026-11-06", 0.13).cajita;
+    const tomorrow = getLedgerBalances(movements, "2026-11-07", 0.13).cajita;
+    assert.ok(tomorrow > today);
+    assert.ok(tomorrow - today <= 200);
+  });
+
+  test("interest earned in the month counts the growth plus the user's corrections", () => {
+    const movements = [
+      opening("cajita", 10_000, "2026-11-01"),
+      row({ date: "2026-11-15", type: "adjustment", amount: pesos(2), to: "cajita", category: "Rendimiento" }),
+    ];
+    const earned = getYieldEarnedInMonth(movements, 0.13, "2026-11", "2026-11-30");
+    const growth = getLedgerBalances(movements, "2026-11-30", 0.13).cajita - pesos(10_000) - pesos(2);
+    assert.equal(earned, growth + pesos(2));
+    assert.ok(earned > pesos(100));
+  });
+
+  test("defaults to the day before the due date and estimates from the grown balance", () => {
+    const data = appData([opening("cajita", 20_000)], "2026-11-20", 0.13);
+    const dashboard = buildDashboard(data, "2026-11-20");
     assert.equal(dashboard.plan.plannedDate, "2026-11-30");
-    assert.equal(dashboard.estimatedYield, 7_123);
+    // The balance already grew for 19 days, and the estimate compounds from there.
+    assert.ok(dashboard.balances.cajita > pesos(20_000));
+    assert.equal(
+      dashboard.estimatedYield,
+      estimateYield(dashboard.balances.cajita, 0.13, 10),
+    );
   });
 
   test("a balance check stores the difference as yield", () => {

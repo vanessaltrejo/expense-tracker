@@ -40,7 +40,6 @@ const TYPE_LABELS: Record<MovementType, string> = {
 const DATA_KIND_LABELS: Record<DataKind, string> = {
   real: "Real",
   dummy: "Dummy",
-  prior: "Previo",
 };
 
 const STATUS_LABELS: Record<ExpectedChargeStatus, string> = {
@@ -67,6 +66,8 @@ const TYPE_BY_LABEL = invert(TYPE_LABELS);
 const DATA_KIND_BY_LABEL = invert(DATA_KIND_LABELS);
 const STATUS_BY_LABEL = invert(STATUS_LABELS);
 const ENDPOINT_BY_LABEL = invert(ENDPOINT_LABELS);
+// Earlier name of the "Deuda mami" pocket, so rows typed before the rename still read.
+ENDPOINT_BY_LABEL.set("por cobrar (mamá)", "porCobrarMama");
 const FREQUENCY_BY_LABEL = invert(FREQUENCY_LABELS);
 
 const SHEETS_EPOCH_MS = Date.UTC(1899, 11, 30);

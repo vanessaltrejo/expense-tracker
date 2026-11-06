@@ -54,12 +54,12 @@ describe("Movimientos rows", () => {
     to: null,
     category: "salidas",
     note: "Salida Panorama",
-    dataKind: "prior",
+    dataKind: "dummy",
   };
 
   test("a row written by the app reads back the same", () => {
     const row = movementToRow(movement);
-    assert.deepEqual(row, ["H22", "2026-10-31", "Gasto con tarjeta", 1307.06, "Tarjeta Nu", "", "salidas", "Salida Panorama", "Previo"]);
+    assert.deepEqual(row, ["H22", "2026-10-31", "Gasto con tarjeta", 1307.06, "Tarjeta Nu", "", "salidas", "Salida Panorama", "Dummy"]);
     const parsed = parseMovementRow(row);
     assert.ok("value" in parsed);
     assert.deepEqual(parsed.value, movement);
@@ -70,6 +70,14 @@ describe("Movimientos rows", () => {
     assert.ok("issue" in badType);
     const badAmount = parseMovementRow(["H1", 46331, "Gasto", "diez", "Efectivo", "", "", "", "Real"]);
     assert.ok("issue" in badAmount);
+  });
+
+  test("rows written before the Deuda mami rename still read as the same pocket", () => {
+    const oldName = parseMovementRow(["4", 46331, "Ajuste", 5000, "", "Por cobrar (mamá)", "Saldo inicial", "", "Real"]);
+    const newName = parseMovementRow(["4", 46331, "Ajuste", 5000, "", "Deuda mami", "Saldo inicial", "", "Real"]);
+    assert.ok("value" in oldName && "value" in newName);
+    assert.equal(oldName.value.to, "porCobrarMama");
+    assert.equal(newName.value.to, "porCobrarMama");
   });
 
   test("an empty Dato means Real, and an empty ID is kept for the app to fill", () => {

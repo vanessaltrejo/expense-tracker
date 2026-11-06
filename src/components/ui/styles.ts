@@ -31,6 +31,14 @@ const CATEGORY_ICONS: Record<string, string> = {
   "Saldo inicial": "🏁",
 };
 
+/**
+ * Categories are stored in lowercase ("antojos") so the sheet stays easy to type in,
+ * and shown with a capital letter. A native dropdown can't style its text with CSS.
+ */
+export function formatCategory(category: string): string {
+  return category.charAt(0).toUpperCase() + category.slice(1);
+}
+
 export function getCategoryIcon(category: string | null): string {
   return (category && CATEGORY_ICONS[category]) ?? "•";
 }

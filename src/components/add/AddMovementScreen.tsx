@@ -12,7 +12,6 @@ import { ShortcutList } from "./ShortcutList";
 type AddTab = MovementFormKind | "payment" | "adjustment";
 
 const TABS: { id: AddTab; label: string; param: string }[] = [
-  { id: "cardExpense", label: "▭ Con tarjeta", param: "tarjeta" },
   { id: "expense", label: "↑ Gasto", param: "gasto" },
   { id: "income", label: "↓ Ingreso", param: "ingreso" },
   { id: "transfer", label: "⇄ Mover", param: "mover" },
@@ -21,8 +20,7 @@ const TABS: { id: AddTab; label: string; param: string }[] = [
 ];
 
 const TAB_HELP: Record<AddTab, string> = {
-  cardExpense: "Algo que pagaste con tu Tarjeta Nu. Sube tu deuda.",
-  expense: "Algo que pagaste con efectivo, la cajita o que pagó tu mamá.",
+  expense: "Algo que pagaste. Casi siempre es con tu Tarjeta Nu, y eso sube tu deuda.",
   income: "Dinero que te llegó: horno³, comedor o tu mamá.",
   transfer: "Mover dinero entre tus bolsas. No es un gasto.",
   payment: "Lo que abonaste a la tarjeta. Puedes pagar en varias partes.",
@@ -56,7 +54,7 @@ function AddMovementContent({ initialTab }: { initialTab: AddTab }) {
       </div>
       <p className="-mt-1 px-1 text-sm text-ink-soft">{TAB_HELP[tab]}</p>
 
-      {tab === "cardExpense" ? <ShortcutList /> : null}
+      {tab === "expense" ? <ShortcutList /> : null}
       {tab === "payment" ? <PaymentForm /> : null}
       {tab === "adjustment" ? <AdjustmentForm /> : null}
       {tab !== "payment" && tab !== "adjustment" ? (
@@ -73,7 +71,7 @@ export function AddMovementScreen() {
   const searchParams = useSearchParams();
   const [visit, setVisit] = useState(0);
   const requested = searchParams.get("tipo");
-  const initialTab = TABS.find((item) => item.param === requested)?.id ?? "cardExpense";
+  const initialTab = TABS.find((item) => item.param === requested)?.id ?? "expense";
 
   // Next.js keeps a page's state when navigating away, and this cleanup runs at that
   // moment. Starting over each visit keeps a saved amount from being registered twice,

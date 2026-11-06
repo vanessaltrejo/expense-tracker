@@ -20,8 +20,7 @@ export function YieldCard() {
         </p>
         <p className="amount mt-1 text-sm text-ink-soft">
           Llegarías con {formatMoney(dashboard.cajitaOnPaymentDay)} a la cajita.
-          Es una estimación al {Math.round(data.settings.annualYieldRate * 100)}%
-          anual.
+          Interés compuesto diario al {Math.round(data.settings.annualYieldRate * 100)}% anual.
         </p>
       </div>
 

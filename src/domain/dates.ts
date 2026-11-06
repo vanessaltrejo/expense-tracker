@@ -90,6 +90,20 @@ export function formatShortDate(date: IsoDate): string {
     .replace(".", "");
 }
 
+/** Header for a day in a list, like "Jueves 5 nov". */
+export function formatDayHeader(date: IsoDate): string {
+  const text = new Intl.DateTimeFormat("es-MX", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  })
+    .format(toUtcMs(date))
+    .replace(/[.,]/g, "")
+    .replace(" de ", " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export function formatLongDate(date: IsoDate): string {
   return new Intl.DateTimeFormat("es-MX", {
     weekday: "long",

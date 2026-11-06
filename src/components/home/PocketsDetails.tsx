@@ -16,13 +16,8 @@ export function PocketsDetails() {
   const usage = getUsageTone(usedPercent);
 
   return (
-    <details className="card group">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between font-medium [&::-webkit-details-marker]:hidden">
-        Bolsas y crédito
-        <span aria-hidden="true" className="text-ink-soft transition-transform group-open:rotate-180">
-          ▾
-        </span>
-      </summary>
+    <section className="card">
+      <h2 className="font-medium">Bolsas y crédito</h2>
 
       <ul className="grid grid-cols-2 gap-2">
         {POCKETS.map((pocket) => (
@@ -34,9 +29,6 @@ export function PocketsDetails() {
           </li>
         ))}
       </ul>
-      <p className="text-xs text-ink-soft">
-        &ldquo;Por cobrar&rdquo; cuenta en tu libre de verdad, pero no sirve para pagar la tarjeta hasta que te lo regresen.
-      </p>
 
       <div className="flex flex-col gap-2 border-t border-line pt-3">
         <div className="flex justify-between gap-3">
@@ -55,6 +47,6 @@ export function PocketsDetails() {
           de {formatMoney(limit)}
         </p>
       </div>
-    </details>
+    </section>
   );
 }

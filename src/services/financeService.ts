@@ -153,35 +153,26 @@ export async function logShortcutWithPrice(
   return logShortcut(priced, fixedExpenses, today);
 }
 
-const SETUP_POCKETS: PocketId[] = [
-  "cajita",
-  "banorte",
-  "efectivo",
-  "porCobrarMama",
-  "tarjetaNu",
-];
+/** Only the money the user holds needs an opening balance: card debt and Deuda mami come from movements. */
+export type OpeningPocket = Extract<PocketId, "cajita" | "banorte" | "efectivo">;
 
-/**
- * Every pocket gets an opening row, even at 0: without one, the pocket would count
- * every older movement imported from the old spreadsheet.
- */
+const SETUP_POCKETS: OpeningPocket[] = ["cajita", "banorte", "efectivo"];
+
+/** Every pocket gets an opening row, even at 0, so the pocket has a clear starting date. */
 export async function setupOpeningBalances(
-  balances: Record<PocketId, Cents>,
+  balances: Record<OpeningPocket, Cents>,
   today: IsoDate,
 ): Promise<void> {
-  const drafts: MovementDraft[] = SETUP_POCKETS.map((pocket) => {
-    const isDebt = pocket === "tarjetaNu";
-    return {
-      date: today,
-      type: "adjustment",
-      amount: balances[pocket],
-      from: isDebt ? pocket : null,
-      to: isDebt ? null : pocket,
-      category: OPENING_BALANCE_CATEGORY,
-      note: "Saldo inicial",
-      dataKind: "real",
-    };
-  });
+  const drafts: MovementDraft[] = SETUP_POCKETS.map((pocket) => ({
+    date: today,
+    type: "adjustment",
+    amount: balances[pocket],
+    from: null,
+    to: pocket,
+    category: OPENING_BALANCE_CATEGORY,
+    note: "Saldo inicial",
+    dataKind: "real",
+  }));
   await repository.current.addMovements(drafts);
   // Asks the browser not to clear this data when the phone runs low on space.
   await navigator.storage?.persist?.();
@@ -302,7 +293,11 @@ export async function adjustCajitaBalance(
   realBalance: Cents,
   today: IsoDate,
 ): Promise<Undo | null> {
-  const current = getLedgerBalances(data.movements, today).cajita;
+  const current = getLedgerBalances(
+    data.movements,
+    today,
+    data.settings.annualYieldRate,
+  ).cajita;
   const adjustment = buildYieldAdjustment(current, realBalance, today);
   return adjustment ? addMovement(adjustment) : null;
 }

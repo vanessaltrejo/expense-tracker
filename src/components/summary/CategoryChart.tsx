@@ -1,6 +1,7 @@
 import type { CategoryComparison } from "@/domain/dashboard";
 import { formatMonthName } from "@/domain/dates";
 import { formatMoney } from "@/domain/money";
+import { formatCategory } from "../ui/styles";
 
 interface CategoryChartProps {
   categories: CategoryComparison[];
@@ -68,7 +69,7 @@ export function CategoryChart({
       <ul className="flex flex-col gap-4">
         {categories.map((row) => (
           <li key={row.category} className="flex flex-col gap-1">
-            <p className="text-sm font-medium first-letter:uppercase">{row.category}</p>
+            <p className="text-sm font-medium">{formatCategory(row.category)}</p>
             <Bar
               value={row.thisMonth}
               max={max}

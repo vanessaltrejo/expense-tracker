@@ -11,7 +11,7 @@ import {
   monthKey,
   previousMonthKey,
 } from "./dates.ts";
-import { getLedgerBalances, YIELD_CATEGORY } from "./ledger.ts";
+import { dailyGrowth, getLedgerBalances, YIELD_CATEGORY } from "./ledger.ts";
 import { getIntervalReminders, type IntervalReminder } from "./recurring.ts";
 import type {
   AppData,
@@ -24,14 +24,36 @@ import type {
   StatementRecord,
 } from "./types.ts";
 
-/** Simple interest from the proposal: balance x rate / 365 x days. */
+/** Interest the balance will earn in `days` days, compounded daily. */
 export function estimateYield(
   balance: Cents,
   annualRate: number,
   days: number,
 ): Cents {
   if (balance <= 0 || days <= 0) return 0;
-  return Math.round((balance * annualRate * days) / 365);
+  return Math.round(balance * (dailyGrowth(annualRate, days) - 1));
+}
+
+/**
+ * Interest earned inside a month: what the cajita grew on its own, plus the corrections
+ * the user made when comparing with Nu. `asOf` cuts the current month at today.
+ */
+export function getYieldEarnedInMonth(
+  movements: Movement[],
+  annualRate: number,
+  key: string,
+  asOf: IsoDate,
+): Cents {
+  const monthStart = `${key}-01`;
+  const end = endOfMonth(monthStart) < asOf ? endOfMonth(monthStart) : asOf;
+  const before = addDays(monthStart, -1);
+
+  const interestUntil = (date: IsoDate): number =>
+    getLedgerBalances(movements, date, annualRate).cajita -
+    getLedgerBalances(movements, date).cajita;
+
+  const grown = end < monthStart ? 0 : interestUntil(end) - interestUntil(before);
+  return grown + getYieldForMonth(movements, key);
 }
 
 export function getYieldForMonth(movements: Movement[], key: string): Cents {
@@ -72,16 +94,12 @@ export interface Dashboard {
   /** Card debt not yet covered by real money. Mom's loan doesn't pay the card until it comes back. */
   toCoverDebt: Cents;
   /** The same, counting the expected charges of this month. */
-  toCoverWithExpected: Cents;
-  expectedThisMonth: Cents;
-  freeAfterExpected: Cents;
+  expectedThisPeriod: Cents;
   upcomingCharges: ExpectedCharge[];
   creditLeft: Cents;
   card: CardStatus;
   /** Amount owed by the due date, including expected charges that will enter this cut. */
   projectedDue: Cents;
-  /** Debt and expected charges that move to the following due date. */
-  projectedNext: Cents;
   plan: PlanView;
   estimatedYield: Cents;
   cajitaOnPaymentDay: Cents;
@@ -112,7 +130,7 @@ function buildPlanView(
 
 export function buildDashboard(data: AppData, today: IsoDate): Dashboard {
   const { movements, settings, statements, expectedCharges } = data;
-  const balances = getLedgerBalances(movements, today);
+  const balances = getLedgerBalances(movements, today, settings.annualYieldRate);
 
   const realMoney = balances.cajita + balances.banorte + balances.efectivo;
   const debt = 0 - balances.tarjetaNu;
@@ -123,29 +141,28 @@ export function buildDashboard(data: AppData, today: IsoDate): Dashboard {
   const pending = expectedCharges.filter(
     (charge) => charge.status === "expected",
   );
-  const monthEnd = endOfMonth(today);
+  // Charges follow the card's periods (cut to cut), not calendar months: only those up to
+  // the next cut show, plus any older one still unconfirmed. The rest appears after the cut.
+  const periodCut = getCutForDate(today, settings);
   const upcomingCharges = pending
-    .filter((charge) => charge.date <= monthEnd)
+    .filter((charge) => getCutForDate(charge.date, settings) <= periodCut)
     .sort((a, b) => a.date.localeCompare(b.date));
-  const expectedThisMonth = upcomingCharges.reduce(
+  const expectedThisPeriod = upcomingCharges.reduce(
     (total, charge) => total + charge.amount,
     0,
   );
 
   const card = getCardStatus(movements, statements, settings, today);
 
-  let expectedInThisCut = 0;
-  let expectedInLaterCut = 0;
-  for (const charge of upcomingCharges) {
-    if (card.phase === "open" && getCutForDate(charge.date, settings) <= card.cutDate) {
-      expectedInThisCut += charge.amount;
-    } else {
-      expectedInLaterCut += charge.amount;
-    }
-  }
+  // Only charges that land before the cut are paid on the card's next due date.
+  const expectedInThisCut =
+    card.phase === "open"
+      ? upcomingCharges
+          .filter((charge) => getCutForDate(charge.date, settings) <= card.cutDate)
+          .reduce((total, charge) => total + charge.amount, 0)
+      : 0;
 
   const projectedDue = card.remaining + expectedInThisCut;
-  const projectedNext = card.nextPeriod + expectedInLaterCut;
   const plan = buildPlanView(
     data.paymentPlan,
     balances,
@@ -166,18 +183,20 @@ export function buildDashboard(data: AppData, today: IsoDate): Dashboard {
     debt,
     free,
     toCoverDebt,
-    toCoverWithExpected: Math.max(0, debt + expectedThisMonth - realMoney),
-    expectedThisMonth,
-    freeAfterExpected: free - expectedThisMonth,
+    expectedThisPeriod,
     upcomingCharges,
     creditLeft: settings.cardLimit - debt,
     card,
     projectedDue,
-    projectedNext,
     plan,
     estimatedYield,
     cajitaOnPaymentDay: balances.cajita + estimatedYield,
-    yieldThisMonth: getYieldForMonth(movements, monthKey(today)),
+    yieldThisMonth: getYieldEarnedInMonth(
+      movements,
+      settings.annualYieldRate,
+      monthKey(today),
+      today,
+    ),
     intervalReminders: getIntervalReminders(data.fixedExpenses, today),
   };
 }
@@ -267,8 +286,18 @@ export function buildMonthlySummary(
     incomeLastMonth,
     outflowThisMonth,
     outflowLastMonth,
-    yieldThisMonth: getYieldForMonth(realMovements, thisMonthKey),
-    yieldLastMonth: getYieldForMonth(realMovements, lastMonthKey),
+    yieldThisMonth: getYieldEarnedInMonth(
+      realMovements,
+      data.settings.annualYieldRate,
+      thisMonthKey,
+      today,
+    ),
+    yieldLastMonth: getYieldEarnedInMonth(
+      realMovements,
+      data.settings.annualYieldRate,
+      lastMonthKey,
+      today,
+    ),
     paidByMomThisMonth,
     recentStatements: getRecentStatements(
       data.movements,

@@ -36,8 +36,8 @@ export const seedFixedExpenses: FixedExpense[] = [
   {
     id: "icloud",
     name: "iCloud",
-    normalAmount: pesos(180),
-    schedule: { kind: "monthly", dayOfMonth: 27 },
+    normalAmount: pesos(175.39),
+    schedule: { kind: "monthly", dayOfMonth: 1 },
     category: "suscripciones",
     startDate: "2026-09-01",
     endDate: null,

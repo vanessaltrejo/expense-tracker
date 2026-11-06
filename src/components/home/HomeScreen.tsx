@@ -2,20 +2,20 @@
 
 import Link from "next/link";
 
-import { formatLongDate } from "@/domain/dates";
+import { formatLongDate, formatShortDate } from "@/domain/dates";
 import { formatMoney } from "@/domain/money";
 import { PENDING_CATEGORY } from "@/data/seedData";
 import { moveBanorteToCajita } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
 import { POCKET_STYLES } from "../ui/styles";
 import { IntervalReminderCard } from "./IntervalReminderCard";
-import { PaymentPlanCard } from "./PaymentPlanCard";
+import { MomDebtCard } from "./MomDebtCard";
 import { PocketsDetails } from "./PocketsDetails";
 import { UpcomingCharges } from "./UpcomingCharges";
 import { YieldCard } from "./YieldCard";
 
 const QUICK_ACTIONS = [
-  { href: "/agregar", icon: "▭", label: "Gasto con tarjeta", tone: "bg-tarjeta-soft text-tarjeta" },
+  { href: "/agregar", icon: "▭", label: "Agregar gasto", tone: "bg-tarjeta-soft text-tarjeta" },
   { href: "/agregar?tipo=pago", icon: "✓", label: "Pagar tarjeta", tone: "bg-good-soft text-good" },
   { href: "/agregar?tipo=mover", icon: "⇄", label: "Mover dinero", tone: "bg-cajita-soft text-cajita" },
 ];
@@ -24,12 +24,17 @@ function signed(amount: number): string {
   return `${amount < 0 ? "−" : ""}${formatMoney(Math.abs(amount))}`;
 }
 
-/** The headline is what is still owed, because that is the number that drives decisions. */
+/**
+ * Three numbers, in the order that matters: what the card says, what is still missing
+ * with the money at hand, and the whole picture counting what mom owes.
+ */
 function HeroBalance() {
   const { dashboard, today } = useFinance();
-  const { free, toCoverDebt, toCoverWithExpected, expectedThisMonth, realMoney, debt, balances } =
+  const { free, toCoverDebt, projectedDue, card, realMoney, debt, balances } =
     dashboard;
-  const isCovered = toCoverDebt === 0;
+  // Charges that will land before the cut and are paid on the same due date.
+  const expectedBeforeCut = projectedDue - card.remaining;
+  const missingOnDueDate = Math.max(0, projectedDue - realMoney);
 
   return (
     <section
@@ -38,39 +43,37 @@ function HeroBalance() {
     >
       <p className="text-sm text-white/80 first-letter:uppercase">{formatLongDate(today)}</p>
       <h1 id="hero-label" className="mt-3 text-base font-medium text-white/90">
-        {isCovered ? "Ya te alcanza para pagar la tarjeta" : "Te falta para pagar la tarjeta"}
+        Debes en la tarjeta
       </h1>
       <p className="amount mt-0.5 text-[2.75rem] leading-tight font-semibold tracking-tight">
-        {isCovered ? formatMoney(debt) : formatMoney(toCoverDebt)}
-      </p>
-      <p className="amount mt-1 text-sm text-white/85">
-        {isCovered
-          ? `Debes ${formatMoney(debt)} y tienes ${formatMoney(realMoney)}.`
-          : `Debes ${formatMoney(debt)} y tienes ${formatMoney(realMoney)} para pagarla.`}
+        {formatMoney(debt)}
       </p>
 
       <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
-        <div className="col-span-2 rounded-2xl bg-white/12 p-3">
-          <dt className="text-white/80">
-            Libre de verdad
-            {balances.porCobrarMama > 0 ? " (contando lo que te debe tu mamá)" : ""}
-          </dt>
-          <dd className="amount mt-0.5 text-xl font-semibold">{signed(free)}</dd>
+        <div className="rounded-2xl bg-white/12 p-3">
+          <dt className="text-white/80">Te falta juntar</dt>
+          <dd className="amount mt-0.5 text-lg font-semibold">{formatMoney(toCoverDebt)}</dd>
+          <dd className="mt-0.5 text-xs text-white/70">
+            Tienes {formatMoney(realMoney)}
+          </dd>
         </div>
         <div className="rounded-2xl bg-white/12 p-3">
-          <dt className="text-white/80">Dinero real</dt>
-          <dd className="amount mt-0.5 font-semibold">{formatMoney(realMoney)}</dd>
+          <dt className="text-white/80">Balance total</dt>
+          <dd className="amount mt-0.5 text-lg font-semibold">{signed(free)}</dd>
+          <dd className="mt-0.5 text-xs text-white/70">
+            {balances.porCobrarMama > 0 ? "Contando Deuda mami" : "Tu dinero menos la tarjeta"}
+          </dd>
         </div>
-        <div className="rounded-2xl bg-white/12 p-3">
-          <dt className="text-white/80">Tu mamá te debe</dt>
-          <dd className="amount mt-0.5 font-semibold">{formatMoney(balances.porCobrarMama)}</dd>
-        </div>
-        {expectedThisMonth > 0 ? (
+        {expectedBeforeCut > 0 ? (
           <div className="col-span-2 rounded-2xl bg-white/12 p-3">
             <dt className="text-white/80">
-              Con {formatMoney(expectedThisMonth)} en pagos esperados te faltaría
+              Con tus suscripciones, el {formatShortDate(card.dueDate)} pagas
             </dt>
-            <dd className="amount mt-0.5 font-semibold">{formatMoney(toCoverWithExpected)}</dd>
+            <dd className="amount mt-0.5 text-lg font-semibold">{formatMoney(projectedDue)}</dd>
+            <dd className="amount mt-0.5 text-xs text-white/70">
+              Debes {formatMoney(card.remaining)} + {formatMoney(expectedBeforeCut)} que se cobran
+              antes del corte. Te faltaría juntar {formatMoney(missingOnDueDate)}.
+            </dd>
           </div>
         ) : null}
       </dl>
@@ -89,6 +92,7 @@ export function HomeScreen() {
   return (
     <>
       <HeroBalance />
+      <MomDebtCard />
 
       <nav aria-label="Acciones rápidas" className="grid grid-cols-3 gap-2">
         {QUICK_ACTIONS.map((action) => (
@@ -158,21 +162,6 @@ export function HomeScreen() {
 
       <UpcomingCharges />
 
-      {balances.porCobrarMama > 0 ? (
-        <section className={`card ${POCKET_STYLES.porCobrarMama.soft}`}>
-          <h2 className={`text-sm font-semibold ${POCKET_STYLES.porCobrarMama.text}`}>
-            Tu mamá te debe
-          </h2>
-          <p className="amount -mt-2 text-2xl font-semibold">
-            {formatMoney(balances.porCobrarMama)}
-          </p>
-          <Link href="/agregar?tipo=mover" className="btn-secondary bg-surface">
-            Ya me regresó dinero
-          </Link>
-        </section>
-      ) : null}
-
-      <PaymentPlanCard />
       <YieldCard />
       <PocketsDetails />
     </>

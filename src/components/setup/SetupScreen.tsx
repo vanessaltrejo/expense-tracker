@@ -6,28 +6,23 @@ import { type FormEvent, useState } from "react";
 import { formatLongDate } from "@/domain/dates";
 import { ENDPOINT_LABELS } from "@/domain/ledger";
 import { formatMoney, parseMoneyInput } from "@/domain/money";
-import type { PocketId } from "@/domain/types";
-import { setupOpeningBalances } from "@/services/financeService";
+import { type OpeningPocket, setupOpeningBalances } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
 import { AmountField } from "../ui/AmountField";
 import { POCKET_STYLES } from "../ui/styles";
 
-const FIELDS: { pocket: PocketId; hint: string }[] = [
+const FIELDS: { pocket: OpeningPocket; hint: string }[] = [
   { pocket: "cajita", hint: "Lo que ves en tu cajita Turbo en Nu." },
   { pocket: "banorte", hint: "Si ya lo pasaste todo a la cajita, déjalo vacío." },
   { pocket: "efectivo", hint: "El que traes en la cartera." },
-  { pocket: "porCobrarMama", hint: "Lo que tu mamá te debe de efectivo prestado." },
-  { pocket: "tarjetaNu", hint: "Tu saldo usado en la tarjeta de crédito hoy." },
 ];
 
 export function SetupScreen() {
   const { today, runAction, syncState } = useFinance();
-  const [values, setValues] = useState<Record<PocketId, string>>({
+  const [values, setValues] = useState<Record<OpeningPocket, string>>({
     cajita: "",
     banorte: "",
     efectivo: "",
-    porCobrarMama: "",
-    tarjetaNu: "",
   });
 
   const parsed = Object.fromEntries(
@@ -35,13 +30,13 @@ export function SetupScreen() {
       pocket,
       values[pocket] === "" ? 0 : parseMoneyInput(values[pocket]),
     ]),
-  ) as Record<PocketId, number | null>;
+  ) as Record<OpeningPocket, number | null>;
   const allValid = FIELDS.every(({ pocket }) => parsed[pocket] !== null);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!allValid) return;
-    const balances = parsed as Record<PocketId, number>;
+    const balances = parsed as Record<OpeningPocket, number>;
     void runAction("Listo, ya empezaste con tus saldos reales", () =>
       setupOpeningBalances(balances, today),
     );
@@ -55,8 +50,9 @@ export function SetupScreen() {
         </p>
         <h1 className="mt-2 text-2xl font-semibold">Empecemos con tus saldos de hoy</h1>
         <p className="mt-2 text-ink-soft">
-          Escribe cuánto hay en cada bolsa ahorita. Desde aquí la app lleva tus
-          cuentas. Tus gastos fijos, cortes y atajos ya están cargados.
+          Escribe cuánto dinero hay en cada bolsa ahorita. Lo que debes en la tarjeta y la
+          Deuda mami salen de tus movimientos. Tus gastos fijos, cortes y atajos ya están
+          cargados.
         </p>
       </div>
 
@@ -85,11 +81,7 @@ export function SetupScreen() {
             />
             <div className="min-w-0 flex-1">
               <AmountField
-                label={
-                  pocket === "tarjetaNu"
-                    ? "Lo que debes en la Tarjeta Nu"
-                    : ENDPOINT_LABELS[pocket]
-                }
+                label={ENDPOINT_LABELS[pocket]}
                 value={values[pocket]}
                 onChange={(value) => setValues({ ...values, [pocket]: value })}
                 hint={hint}
@@ -100,34 +92,12 @@ export function SetupScreen() {
       </div>
 
       {allValid ? (
-        <div className="amount flex flex-col gap-1 px-1 text-sm text-ink-soft">
-          <p>
-            Te falta para pagar la tarjeta:{" "}
-            <span className="font-semibold text-ink">
-              {formatMoney(
-                Math.max(
-                  0,
-                  (parsed.tarjetaNu ?? 0) -
-                    (parsed.cajita ?? 0) -
-                    (parsed.banorte ?? 0) -
-                    (parsed.efectivo ?? 0),
-                ),
-              )}
-            </span>
-          </p>
-          <p>
-            Libre de verdad, contando lo que te debe tu mamá:{" "}
-            <span className="font-semibold text-ink">
-              {formatMoney(
-                (parsed.cajita ?? 0) +
-                  (parsed.banorte ?? 0) +
-                  (parsed.efectivo ?? 0) +
-                  (parsed.porCobrarMama ?? 0) -
-                  (parsed.tarjetaNu ?? 0),
-              )}
-            </span>
-          </p>
-        </div>
+        <p className="amount px-1 text-sm text-ink-soft">
+          Dinero real:{" "}
+          <span className="font-semibold text-ink">
+            {formatMoney((parsed.cajita ?? 0) + (parsed.banorte ?? 0) + (parsed.efectivo ?? 0))}
+          </span>
+        </p>
       ) : (
         <p className="px-1 text-sm font-medium text-danger">
           Revisa los montos: solo números, por ejemplo 1,250.50

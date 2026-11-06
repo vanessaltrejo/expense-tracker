@@ -21,11 +21,8 @@ export type MovementType =
   | "transfer"
   | "adjustment";
 
-/**
- * real: counts everywhere. dummy: placeholder, counts nowhere.
- * prior: already included in an opening balance, so it counts in the summary only.
- */
-export type DataKind = "real" | "dummy" | "prior";
+/** real: counts everywhere. dummy: placeholder, counts nowhere. */
+export type DataKind = "real" | "dummy";
 
 export interface Movement {
   id: string;

@@ -1,3 +1,4 @@
+import { daysBetween } from "./dates.ts";
 import type {
   Cents,
   IsoDate,
@@ -22,7 +23,7 @@ export const ENDPOINT_LABELS: Record<MovementEndpoint, string> = {
   cajita: "Cajita Turbo",
   banorte: "Banorte",
   efectivo: "Efectivo",
-  porCobrarMama: "Por cobrar (mamá)",
+  porCobrarMama: "Deuda mami",
   tarjetaNu: "Tarjeta Nu",
   mama: "Mamá",
 };
@@ -57,9 +58,20 @@ export function getOpeningDates(
  * as charges come out of it, so its debt is the ledger with the sign flipped.
  * Dummy rows, future rows and rows older than the pocket's opening balance don't count.
  */
+/** Growth of one peso in the cajita after `days` days, compounded daily like Nu does. */
+export function dailyGrowth(annualRate: number, days: number): number {
+  return (1 + annualRate / 365) ** days;
+}
+
+/**
+ * `cajitaRate` is the yearly rate of the cajita (0.13 for 13%). With it, every amount that
+ * entered the cajita earns interest from its date to `asOf`, compounded daily. Without it
+ * (0), balances are plain sums.
+ */
 export function getLedgerBalances(
   movements: Movement[],
   asOf: IsoDate,
+  cajitaRate = 0,
 ): Record<PocketId, Cents> {
   const openings = getOpeningDates(movements);
   const balances: Record<PocketId, Cents> = {
@@ -75,17 +87,23 @@ export function getLedgerBalances(
     return !opening || movement.date >= opening;
   };
 
+  const weight = (pocket: PocketId, date: IsoDate): number =>
+    pocket === "cajita" && cajitaRate > 0
+      ? dailyGrowth(cajitaRate, daysBetween(date, asOf))
+      : 1;
+
   for (const movement of movements) {
     if (movement.dataKind !== "real" || movement.date > asOf) continue;
 
     if (isPocket(movement.to) && counts(movement.to, movement)) {
-      balances[movement.to] += movement.amount;
+      balances[movement.to] += movement.amount * weight(movement.to, movement.date);
     }
     if (isPocket(movement.from) && counts(movement.from, movement)) {
-      balances[movement.from] -= movement.amount;
+      balances[movement.from] -= movement.amount * weight(movement.from, movement.date);
     }
   }
 
+  balances.cajita = Math.round(balances.cajita);
   return balances;
 }
 
@@ -141,6 +159,17 @@ export function buildPaymentMovements(input: PaymentInput): MovementDraft[] {
   }
 
   return drafts;
+}
+
+/** Category of the entries that only record what mom owes, like "Viaje EGS" in her card. */
+export const MOM_DEBT_CATEGORY = "Deuda mami";
+
+/**
+ * Bookkeeping that exists for the calculations and would repeat something already in the
+ * history: the purchase is already listed as a card expense, this entry only raises Deuda mami.
+ */
+export function isMomDebtEntry(movement: Movement): boolean {
+  return movement.type === "adjustment" && movement.category === MOM_DEBT_CATEGORY;
 }
 
 /** Records the difference between the app and Nu as yield. Null if they already match. */

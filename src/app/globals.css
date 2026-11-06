@@ -2,7 +2,7 @@
 
 /*
  * Color system: one hue per job, always the same everywhere.
- * Pockets: cajita violet, banorte rose, efectivo green, por cobrar amber, tarjeta blue.
+ * Pockets: cajita violet, banorte rose, efectivo green, deuda mami teal, tarjeta blue.
  * Status: expected amber, charged green, skipped gray, overdue red (same as the sheet).
  */
 :root {
@@ -31,8 +31,8 @@
   --banorte-soft: #fbe9ef;
   --efectivo: #1f8a4c;
   --efectivo-soft: #e5f5eb;
-  --cobrar: #a86400;
-  --cobrar-soft: #fdf1dc;
+  --cobrar: #0b7a80;
+  --cobrar-soft: #ddf3f3;
   --tarjeta: #1f66c1;
   --tarjeta-soft: #e6eefa;
 
@@ -67,8 +67,8 @@
     --banorte-soft: #3a1f29;
     --efectivo: #6fd39a;
     --efectivo-soft: #17301f;
-    --cobrar: #f0b45a;
-    --cobrar-soft: #3a2a10;
+    --cobrar: #5fd3d8;
+    --cobrar-soft: #11302f;
     --tarjeta: #5a9bea;
     --tarjeta-soft: #1b2a3f;
 

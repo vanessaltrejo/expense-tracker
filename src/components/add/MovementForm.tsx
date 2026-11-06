@@ -9,11 +9,12 @@ import type { MovementDraft, MovementEndpoint, PocketId } from "@/domain/types";
 import { addMovement, saveShortcut } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
 import { AmountField } from "../ui/AmountField";
-import { getCategoryIcon } from "../ui/styles";
+import { formatCategory, getCategoryIcon } from "../ui/styles";
 
-export type MovementFormKind = "cardExpense" | "expense" | "income" | "transfer";
+export type MovementFormKind = "expense" | "income" | "transfer";
 
-const EXPENSE_SOURCES: MovementEndpoint[] = ["efectivo", "cajita", "banorte", "mama"];
+/** The card goes first because almost every expense is paid with it. */
+const EXPENSE_SOURCES: MovementEndpoint[] = ["tarjetaNu", "efectivo", "cajita", "banorte", "mama"];
 const INCOME_TARGETS: PocketId[] = ["banorte", "efectivo"];
 const TRANSFER_POCKETS: PocketId[] = ["banorte", "cajita", "efectivo", "porCobrarMama"];
 
@@ -58,7 +59,7 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
   const [date, setDate] = useState(today);
   const [note, setNote] = useState("");
   const [keepAsShortcut, setKeepAsShortcut] = useState(false);
-  const [expenseFrom, setExpenseFrom] = useState<MovementEndpoint>("efectivo");
+  const [expenseFrom, setExpenseFrom] = useState<MovementEndpoint>("tarjetaNu");
   const [incomeTo, setIncomeTo] = useState<PocketId>("banorte");
   const [transferFrom, setTransferFrom] = useState<PocketId>("banorte");
   const [transferTo, setTransferTo] = useState<PocketId>("cajita");
@@ -87,10 +88,14 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
       category,
     };
     switch (kind) {
-      case "cardExpense":
-        return { ...base, type: "cardExpense", from: "tarjetaNu", to: null };
       case "expense":
-        return { ...base, type: "expense", from: expenseFrom, to: null };
+        return {
+          ...base,
+          // Paying with the card raises the card debt; any other way spends from a pocket.
+          type: expenseFrom === "tarjetaNu" ? "cardExpense" : "expense",
+          from: expenseFrom,
+          to: null,
+        };
       case "income":
         return { ...base, type: "income", from: null, to: incomeTo };
       case "transfer":
@@ -125,7 +130,7 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
     router.push("/");
   };
 
-  const canSaveShortcut = kind === "cardExpense" || kind === "expense";
+  const canSaveShortcut = kind === "expense";
 
   return (
     <form onSubmit={handleSubmit} className="card gap-4">
@@ -200,7 +205,7 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
                 onClick={() => setCategory(option)}
               >
                 <span aria-hidden="true">{getCategoryIcon(option)}</span>
-                <span className="first-letter:uppercase">{option}</span>
+                <span>{formatCategory(option)}</span>
               </button>
             ))}
           </div>
