@@ -156,7 +156,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               href="/agregar"
               aria-label="Agregar movimiento"
               aria-current={pathname === "/agregar" ? "page" : undefined}
-              className="mx-2 flex size-14 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink shadow-md active:scale-95"
+              className="mx-2 flex size-14 shrink-0 -translate-y-3.5 items-center justify-center rounded-full bg-accent text-accent-ink shadow-md active:scale-95"
             >
               <svg
                 viewBox="0 0 24 24"

@@ -3,14 +3,17 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 
+import { PENDING_CATEGORY } from "@/data/seedData";
 import { ENDPOINT_LABELS } from "@/domain/ledger";
 import { formatMoney, parseMoneyInput } from "@/domain/money";
+import { getCategoryOptions } from "@/domain/categories";
 import { getFrequentPlaces } from "@/domain/places";
 import type { MovementDraft, MovementEndpoint, PocketId } from "@/domain/types";
 import { addMovement, saveShortcut } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
 import { AmountField } from "../ui/AmountField";
-import { formatCategory, getCategoryIcon } from "../ui/styles";
+import { CategoryPicker } from "./CategoryPicker";
+import { PlacePicker } from "./PlacePicker";
 
 export type MovementFormKind = "expense" | "income";
 
@@ -68,34 +71,22 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
   const [incomeTo, setIncomeTo] = useState<PocketId>(isSimple ? "bbva" : "banorte");
 
   const amount = parseMoneyInput(amountText);
-  const isFromMom = kind === "income" && category === MOM_INCOME_CATEGORY;
+  // Only the full layout has a Banorte for what her mom sends; Francisco's money lands in BBVA.
+  const isFromMom = kind === "income" && !isSimple && category === MOM_INCOME_CATEGORY;
   const canSubmit =
     amount !== null &&
     amount > 0 &&
     Boolean(date) &&
     category !== null;
 
-  const allCategories =
-    kind === "income" ? data.settings.incomeCategories : data.settings.expenseCategories;
-
-  // The simple layout shows the most used categories first and hides the rest behind a
-  // button, so a long list never crowds the form.
-  const [showAllCategories, setShowAllCategories] = useState(false);
-  const usage = new Map<string, number>();
-  for (const movement of data.movements) {
-    if (movement.category) usage.set(movement.category, (usage.get(movement.category) ?? 0) + 1);
-  }
-  const ranked = [...allCategories].sort(
-    (a, b) => (usage.get(b) ?? 0) - (usage.get(a) ?? 0),
+  // "Pendiente" is not offered when adding: a spend should get its real category right away.
+  // The simple layout puts the most used categories first, so the grid opens on those.
+  const categories = getCategoryOptions(
+    kind === "income" ? data.settings.incomeCategories : data.settings.expenseCategories,
+    data.movements,
+    isSimple,
+    [PENDING_CATEGORY],
   );
-  const VISIBLE_CATEGORIES = 6;
-  const isCrowded = isSimple && allCategories.length > VISIBLE_CATEGORIES + 1;
-  const categories =
-    isCrowded && !showAllCategories
-      ? ranked.filter((option, index) => index < VISIBLE_CATEGORIES || option === category)
-      : isSimple
-        ? ranked
-        : allCategories;
 
   const places = kind === "expense" ? getFrequentPlaces(data.movements, data.settings, category) : [];
   const asksForPlace = kind === "expense" && category !== null && data.settings.placeCategories.includes(category);
@@ -188,51 +179,9 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
         />
       ) : null}
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1.5 text-sm font-medium text-ink-soft">Categoría</legend>
-        <div className="flex flex-wrap gap-2">
-          {categories.map((option) => (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={category === option}
-              className="chip"
-              onClick={() => setCategory(option)}
-            >
-              <span aria-hidden="true">{getCategoryIcon(option)}</span>
-              <span>{formatCategory(option)}</span>
-            </button>
-          ))}
-          {isCrowded ? (
-            <button
-              type="button"
-              className="chip text-ink-soft"
-              onClick={() => setShowAllCategories(!showAllCategories)}
-            >
-              {showAllCategories ? "Ver menos" : "Ver todas"}
-            </button>
-          ) : null}
-        </div>
-      </fieldset>
+      <CategoryPicker options={categories} value={category} onChange={setCategory} />
 
-      {places.length > 0 ? (
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1.5 text-sm font-medium text-ink-soft">Lugar</legend>
-          <div className="flex flex-wrap gap-2">
-            {places.map((place) => (
-              <button
-                key={place}
-                type="button"
-                aria-pressed={note.trim().toLowerCase() === place.toLowerCase()}
-                className="chip"
-                onClick={() => setNote(note.trim().toLowerCase() === place.toLowerCase() ? "" : place)}
-              >
-                {place}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-      ) : null}
+      {places.length > 0 ? <PlacePicker places={places} knownPlaces={data.settings.places} value={note} onChange={setNote} /> : null}
 
       {isSimple ? noteField : null}
 

@@ -153,6 +153,16 @@ body {
     @apply border-accent bg-accent-soft font-semibold text-accent;
   }
 
+  /* A square-ish choice with an icon above its name, for grids of categories and options. */
+  .tile {
+    @apply flex min-h-18 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border border-line px-1 py-2 text-center text-xs font-medium text-ink active:bg-page;
+  }
+
+  .tile[aria-pressed="true"],
+  .tile[aria-checked="true"] {
+    @apply border-accent bg-accent-soft font-semibold text-accent;
+  }
+
   .pill {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold;
   }

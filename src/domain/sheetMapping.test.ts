@@ -146,6 +146,18 @@ describe("other tabs", () => {
     assert.deepEqual(settings.placeCategories, ["salidas", "dates"]);
   });
 
+  test("column N says where each place is offered, with commas for several categories", () => {
+    const rows = [
+      ["Ajuste"],
+      ["x", 0, "", null, "", "", "", "", "", "", "", "Shake Shack", "dates", "dates, Salidas"],
+      ["x", 1, "", null, "", "", "", "", "", "", "", "", "salidas"],
+      ["x", 2, "", null, "", "", "", "", "", "", "", "Wingstop", "", ""],
+    ];
+    const { settings } = parseSettings(rows, fallback);
+    assert.deepEqual(settings.places, ["Shake Shack", "Wingstop"]);
+    assert.deepEqual(settings.placeScopes, { "shake shack": ["dates", "Salidas"] });
+  });
+
   test("Ajustes gives the settings, the category lists and the payment day", () => {
     const rows = [
       ["Ajuste", "Valor", "Nota", null, "Categorías", "Categorías de ingreso"],

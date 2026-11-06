@@ -95,6 +95,11 @@ export interface Settings {
   places: string[];
   /** The categories where the place buttons appear. */
   placeCategories: string[];
+  /**
+   * Where each place is offered: place (lowercase) → its categories. A place without an
+   * entry is offered in every category that asks for a place. Missing on older devices.
+   */
+  placeScopes?: Record<string, string[]>;
 }
 
 export interface PaymentPlan {

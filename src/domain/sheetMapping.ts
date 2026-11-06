@@ -293,7 +293,7 @@ export function shortcutToRow(shortcut: Shortcut): Cell[] {
   ];
 }
 
-// ---------- Ajustes: values in B2:B6, lists in E (gasto), F (ingreso), L (lugares), M (categorías con lugar)
+// ---------- Ajustes: values in B2:B6, lists in E (gasto), F (ingreso), L (lugares), M (categorías con lugar), N (dónde sale cada lugar)
 
 /** Rows of the Ajustes tab, starting at row 1 (the header). */
 export function parseSettings(
@@ -309,8 +309,20 @@ export function parseSettings(
 
   const expenseCategories = column(4);
   const incomeCategories = column(5);
-  // Columns L and M exist only in the simple layout's Sheet; elsewhere they stay empty.
-  const places = column(11);
+  // Columns L, M and N exist only in the simple layout's Sheet; elsewhere they stay empty.
+  // N says in which categories (separated by commas) the place on its row is offered.
+  const places: string[] = [];
+  const placeScopes: Record<string, string[]> = {};
+  for (const row of rows.slice(1)) {
+    const place = text(row[11]);
+    if (place === "") continue;
+    places.push(place);
+    const scope = text(row[13])
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => item !== "");
+    if (scope.length > 0) placeScopes[place.toLowerCase()] = scope;
+  }
   const placeCategories = column(12);
 
   return {
@@ -326,6 +338,7 @@ export function parseSettings(
         incomeCategories.length > 0 ? incomeCategories : fallback.incomeCategories,
       places,
       placeCategories,
+      placeScopes,
     },
     plan: { plannedDate: cellToIsoDate(value(6)) },
   };

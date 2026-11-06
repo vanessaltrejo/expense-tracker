@@ -21,7 +21,8 @@ import type {
  */
 export interface FinanceRepository {
   load(): Promise<AppData>;
-  addMovements(drafts: MovementDraft[]): Promise<Movement[]>;
+  /** A draft may bring its own ID, for parts of a breakdown that are named after their parent. */
+  addMovements(drafts: (MovementDraft & { id?: string })[]): Promise<Movement[]>;
   restoreMovements(movements: Movement[]): Promise<void>;
   deleteMovements(ids: string[]): Promise<void>;
   updateMovement(movement: Movement): Promise<void>;
@@ -158,8 +159,8 @@ class DexieFinanceRepository implements FinanceRepository {
     };
   }
 
-  async addMovements(drafts: MovementDraft[]): Promise<Movement[]> {
-    const created = drafts.map((draft) => ({ ...draft, id: createId("m") }));
+  async addMovements(drafts: (MovementDraft & { id?: string })[]): Promise<Movement[]> {
+    const created = drafts.map((draft) => ({ ...draft, id: draft.id ?? createId("m") }));
     await this.change(async () => {
       await this.db.movements.bulkAdd(created);
       return { kind: "upsertMovements", movements: created };

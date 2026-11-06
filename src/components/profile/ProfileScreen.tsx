@@ -17,16 +17,26 @@ async function leave() {
 }
 
 export function ProfileScreen() {
-  const { user, canEdit } = useFinance();
+  const { user, canEdit, syncState } = useFinance();
 
   return (
     <>
       <h1 className="px-1 text-2xl font-semibold">Perfil</h1>
 
-      <section className="card items-center gap-3 py-6 text-center">
-        <Avatar name={user.name} tone={user.tone} size={88} />
-        <p className="text-xl font-semibold">{user.name}</p>
-        {canEdit ? null : <span className="pill bg-muted-soft text-ink-soft">Solo lectura</span>}
+      <section className="card flex-row items-center gap-4 py-4">
+        <Avatar name={user.name} tone={user.tone} size={64} />
+        <div className="flex min-w-0 flex-col items-start gap-1.5">
+          <p className="truncate text-xl font-semibold">{user.name}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {syncState.status === "synced" ? (
+              <span className="pill bg-good-soft text-good">Conectado</span>
+            ) : null}
+            {syncState.status === "offline" || syncState.status === "error" ? (
+              <span className="pill bg-muted-soft text-ink-soft">Sin conexión</span>
+            ) : null}
+            {canEdit ? null : <span className="pill bg-muted-soft text-ink-soft">Solo lectura</span>}
+          </div>
+        </div>
       </section>
 
       <SyncCard />

@@ -33,7 +33,7 @@ const SIMPLE_TAB_HELP: Partial<Record<AddTab, string>> = {
   expense: "Algo que gastaste, con tu BBVA o con efectivo.",
   income: "Dinero que te depositaron: tu mamá, tu papá u otros.",
   transfer: "Mover dinero entre tu BBVA y tu efectivo, por ejemplo cuando sacas del cajero. No es un gasto.",
-  send: "Dinero que le mandaste a alguien. Sale de tu BBVA, pero no cuenta como gasto.",
+  send: "Dinero que le diste a un familiar, en efectivo o por transferencia, o que te regresaron. No cuenta como gasto. Si es préstamo, la app te dice cuánto te deben.",
 };
 
 function AddMovementContent({ initialTab }: { initialTab: AddTab }) {

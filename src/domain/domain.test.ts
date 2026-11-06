@@ -10,7 +10,7 @@ import {
 } from "./dashboard.ts";
 import { dateInMonth, formatDayHeader, getTodayInMexico } from "./dates.ts";
 import { getHistoryCategories, matchesKind } from "./history.ts";
-import { formatPeriodRange, getPeriodForDate, isInPeriod } from "./periods.ts";
+import { formatPeriodRange, getPeriodForDate, getPeriodsWithData, isInPeriod } from "./periods.ts";
 import { APP_USERS, canEdit, findUserById, findUserByUsername, toSessionUser } from "./users.ts";
 import { getInitials } from "./profile.ts";
 import {
@@ -19,7 +19,9 @@ import {
   OPENING_BALANCE_CATEGORY,
 } from "./ledger.ts";
 import { parseMoneyInput, pesos } from "./money.ts";
-import { getFrequentPlaces, getSentToPeople, getTopPlaces } from "./places.ts";
+import { getLoanBalances, LOAN_CATEGORY, personOf } from "./loans.ts";
+import { getBreakdowns, parentIdOf } from "./breakdown.ts";
+import { getFrequentPlaces, getSentToPeople, getTopPlaces, placeOfNote } from "./places.ts";
 import { generateExpectedCharges } from "./recurring.ts";
 import type {
   AppData,
@@ -208,15 +210,17 @@ describe("places and sent money (simple layout)", () => {
     assert.deepEqual(getFrequentPlaces(movements, placeSettings, null), []);
   });
 
-  test("a place typed twice becomes a button, once does not", () => {
+  test("a place typed twice in a category becomes a button there, once does not", () => {
     const movements = [
       spend("2026-11-01", "Carl's Jr"),
       spend("2026-11-02", "carl's jr"),
       spend("2026-11-03", "Tacos del Tec"),
     ];
-    const places = getFrequentPlaces(movements, placeSettings, "dates");
+    const places = getFrequentPlaces(movements, placeSettings, "salidas");
     assert.ok(places.includes("Carl's Jr"));
     assert.ok(!places.includes("Tacos del Tec"));
+    // What was learned in Salidas isn't offered in Dates.
+    assert.ok(!getFrequentPlaces(movements, placeSettings, "dates").includes("Carl's Jr"));
   });
 
   test("top places add up what was spent at each, ignoring other categories", () => {
@@ -246,6 +250,154 @@ describe("places and sent money (simple layout)", () => {
     assert.equal(sent.total, pesos(400));
     assert.deepEqual(sent.people.map((item) => item.place), ["A Vanessa", "A Mamá"]);
     assert.equal(buildPeriodSummary(appData(movements, "2026-11-05"), "2026-11-05").totalSpent, 0);
+  });
+});
+
+describe("places by category and notes with detail", () => {
+  const scoped: Settings = {
+    ...settings,
+    places: ["Shake Shack", "Bread", "12 Rounds", "Estación"],
+    placeCategories: ["dates", "antojos míos", "gym", "aparte"],
+    placeScopes: { bread: ["Dates", "antojos míos"], "12 rounds": ["gym"], estación: ["aparte"] },
+  };
+
+  test("each place is offered only in its categories, and places without one go everywhere", () => {
+    assert.deepEqual(getFrequentPlaces([], scoped, "dates"), ["Shake Shack", "Bread"]);
+    assert.deepEqual(getFrequentPlaces([], scoped, "antojos míos"), ["Shake Shack", "Bread"]);
+    assert.deepEqual(getFrequentPlaces([], scoped, "gym"), ["Shake Shack", "12 Rounds"]);
+    assert.deepEqual(getFrequentPlaces([], scoped, "aparte"), ["Shake Shack", "Estación"]);
+  });
+
+  test("a note with detail still names its place, and only at a word edge", () => {
+    const places = ["Bread", "12 Rounds"];
+    assert.equal(placeOfNote("Bread · pain aux chocolat", places), "Bread");
+    assert.equal(placeOfNote("12 rounds (day pass)", places), "12 Rounds");
+    assert.equal(placeOfNote("Breadsticks", places), "Breadsticks");
+    assert.equal(placeOfNote("Tacos", places), "Tacos");
+  });
+
+  test("the top places group notes with detail under their place", () => {
+    const period = getPeriodForDate("2026-11-15", { cutDay: 1, dueDay: 1 });
+    const gymRow = (date: string, note: string, amount: number) =>
+      row({ date, type: "expense", amount: pesos(amount), from: "bbva", category: "gym", note });
+    const top = getTopPlaces(
+      [gymRow("2026-11-02", "12 Rounds (day pass)", 180), gymRow("2026-11-03", "12 Rounds", 180)],
+      { ...scoped, placeCategories: ["gym"] },
+      period,
+      5,
+    );
+    assert.deepEqual(top.map((item) => [item.place, item.amount, item.count]), [["12 Rounds", pesos(360), 2]]);
+  });
+});
+
+describe("earlier periods with data", () => {
+  const monthly = { cutDay: 1, dueDay: 1 };
+
+  test("lists the current month and every earlier month with real movements, newest first", () => {
+    const movements = [
+      opening("bbva", 30, "2026-11-06"),
+      row({ date: "2026-10-31", type: "expense", amount: pesos(100), from: "bbva", category: "salidas" }),
+      row({ date: "2026-10-30", type: "income", amount: pesos(3_200), to: "bbva", category: "mesada" }),
+      row({ date: "2026-08-02", type: "expense", amount: pesos(50), from: "bbva", category: "otros" }),
+    ];
+    const periods = getPeriodsWithData(movements, monthly, "2026-11-06");
+    assert.deepEqual(periods.map((period) => period.start), ["2026-11-01", "2026-10-01", "2026-08-01"]);
+  });
+
+  test("an opening balance alone, a dummy row or a future row don't open a period", () => {
+    const movements = [
+      opening("bbva", 30, "2026-09-10"),
+      row({ date: "2026-10-05", type: "expense", amount: pesos(10), from: "bbva", dataKind: "dummy" }),
+      row({ date: "2026-12-05", type: "expense", amount: pesos(10), from: "bbva" }),
+    ];
+    assert.deepEqual(getPeriodsWithData(movements, monthly, "2026-11-06").map((period) => period.start), ["2026-11-01"]);
+  });
+
+  test("the summary of an earlier month adds up only that month", () => {
+    const movements = [
+      row({ date: "2026-10-31", type: "expense", amount: pesos(700), category: "salidas" }),
+      row({ date: "2026-11-03", type: "expense", amount: pesos(585), category: "salidas" }),
+    ];
+    const data = appData(movements, "2026-11-06");
+    const october = getPeriodForDate("2026-10-31", monthly);
+    assert.equal(buildPeriodSummary({ ...data, settings: { ...data.settings, ...monthly } }, "2026-11-06", october).totalSpent, pesos(700));
+  });
+});
+
+describe("breakdowns", () => {
+  const transfer = row({ date: "2026-11-04", type: "transfer", amount: pesos(1_000), from: "bbva", to: "efectivo" }, "m1");
+  const part = (n: number, amount: number, category: string, note: string) =>
+    row({ date: "2026-11-04", type: "expense", amount: pesos(amount), from: "efectivo", category, note }, `m1.${n}`);
+
+  test("a part is named after its movement, and only counts when that movement exists", () => {
+    assert.equal(parentIdOf("m1.2"), "m1");
+    assert.equal(parentIdOf("m1"), null);
+    const { partsByParent, partIds } = getBreakdowns([transfer, part(2, 25, "estacionamiento", "x"), part(1, 420, "dates", "Shake Shack")]);
+    assert.deepEqual(partsByParent.get("m1")?.map((item) => item.id), ["m1.1", "m1.2"]);
+    assert.equal(partIds.size, 2);
+    assert.equal(getBreakdowns([part(1, 10, "dates", "x")]).partIds.size, 0);
+  });
+
+  test("the parts count as spending and the bank movement doesn't, with no double count", () => {
+    const movements = [opening("bbva", 2_000), opening("efectivo", 0), transfer, part(1, 420, "dates", "Shake Shack"), part(2, 580, "aparte", "Estación")];
+    const summary = buildPeriodSummary(appData(movements, "2026-11-05"), "2026-11-05");
+    assert.equal(summary.totalSpent, pesos(1_000));
+    // The withdrawal moves cash in, the parts take it out: BBVA drops by 1,000 and cash nets to 0.
+    const balances = getLedgerBalances(movements, "2026-11-05");
+    assert.equal(balances.bbva, pesos(1_000));
+    assert.equal(balances.efectivo, 0);
+  });
+
+  test("a transfer with a breakdown is not listed as money sent to a person", () => {
+    const period = getPeriodForDate("2026-11-15", { cutDay: 1, dueDay: 1 });
+    const spei = row({ date: "2026-10-31", type: "transfer", amount: pesos(1_600), from: "bbva", note: "Se lo debía" }, "m9");
+    const parts = [
+      row({ date: "2026-10-31", type: "expense", amount: pesos(700), category: "salidas", note: "Cielo Mágico" }, "m9.1"),
+      row({ date: "2026-10-31", type: "expense", amount: pesos(900), category: "salidas", note: "Panorama" }, "m9.2"),
+    ];
+    const october = getPeriodForDate("2026-10-31", { cutDay: 1, dueDay: 1 });
+    assert.equal(getSentToPeople([spei], october).total, pesos(1_600));
+    assert.equal(getSentToPeople([spei, ...parts], october).total, 0);
+    assert.equal(getSentToPeople([spei, ...parts], period).total, 0);
+  });
+});
+
+describe("loans to relatives", () => {
+  const lend = (date: string, amount: number, from: MovementEndpoint, person: string) =>
+    row({ date, type: "transfer", amount: pesos(amount), from, category: LOAN_CATEGORY, note: `A ${person}` });
+  const repay = (date: string, amount: number, to: MovementEndpoint, person: string) =>
+    row({ date, type: "transfer", amount: pesos(amount), to, category: LOAN_CATEGORY, note: `De ${person}` });
+
+  test("what is still owed is what was lent minus what came back, per person", () => {
+    const movements = [
+      lend("2026-11-01", 500, "efectivo", "Mamá"),
+      lend("2026-11-02", 300, "bbva", "Papá"),
+      repay("2026-11-05", 200, "bbva", "mamá"),
+      repay("2026-11-06", 300, "efectivo", "Papá"),
+    ];
+    const owed = getLoanBalances(movements);
+    assert.deepEqual(owed.map((item) => [item.person, item.owed]), [["Mamá", pesos(300)]]);
+    assert.equal(owed[0].lastDate, "2026-11-05");
+  });
+
+  test("a loan moves the balance, but is neither spending nor income nor a plain send", () => {
+    const movements = [
+      opening("bbva", 1_000),
+      lend("2026-11-03", 400, "bbva", "Mamá"),
+      repay("2026-11-04", 100, "bbva", "Mamá"),
+    ];
+    const period = getPeriodForDate("2026-11-15", { cutDay: 1, dueDay: 1 });
+    assert.equal(getLedgerBalances(movements, "2026-11-05").bbva, pesos(700));
+    const summary = buildPeriodSummary(appData(movements, "2026-11-05"), "2026-11-05");
+    assert.equal(summary.totalSpent, 0);
+    assert.equal(summary.income, 0);
+    assert.equal(getSentToPeople(movements, period).total, 0);
+  });
+
+  test("the person's name is read from the note without its prefix", () => {
+    assert.equal(personOf("A Mamá"), "Mamá");
+    assert.equal(personOf("De Tía Lupe"), "Tía Lupe");
+    assert.equal(personOf("Papá"), "Papá");
   });
 });
 

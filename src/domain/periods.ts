@@ -1,6 +1,6 @@
 import { getCutForDate, getDueDateForCut } from "./billing.ts";
 import { addDays, dateInMonth, formatShortDate, getYearMonth, shiftMonth } from "./dates.ts";
-import type { IsoDate, Settings } from "./types.ts";
+import type { IsoDate, Movement, Settings } from "./types.ts";
 
 /**
  * A card period runs from one cut to the day before the next one (the 22nd to the 21st)
@@ -39,4 +39,27 @@ export function isInPeriod(date: IsoDate, period: Period): boolean {
 /** "22 oct – 21 nov" */
 export function formatPeriodRange(period: Period): string {
   return `${formatShortDate(period.start)} – ${formatShortDate(period.end)}`;
+}
+
+/**
+ * The periods that have something to look at, newest first: the current one, and every
+ * earlier one with at least one real movement. An opening balance alone doesn't count,
+ * because that row only sets a starting point.
+ */
+export function getPeriodsWithData(
+  movements: Movement[],
+  settings: BillingDays,
+  today: IsoDate,
+): Period[] {
+  const current = getPeriodForDate(today, settings);
+  const periods = new Map<IsoDate, Period>([[current.start, current]]);
+
+  for (const movement of movements) {
+    if (movement.dataKind === "dummy" || movement.type === "adjustment") continue;
+    if (movement.date > today) continue;
+    const period = getPeriodForDate(movement.date, settings);
+    if (!periods.has(period.start)) periods.set(period.start, period);
+  }
+
+  return [...periods.values()].sort((a, b) => b.start.localeCompare(a.start));
 }

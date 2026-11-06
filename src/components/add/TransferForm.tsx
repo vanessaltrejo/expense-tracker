@@ -6,9 +6,10 @@ import { type FormEvent, useState } from "react";
 import { ENDPOINT_LABELS } from "@/domain/ledger";
 import { formatMoney, parseMoneyInput } from "@/domain/money";
 import type { PocketId } from "@/domain/types";
-import { addMovement } from "@/services/financeService";
+import { addMovement, addMovementWithBreakdown } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
 import { AmountField } from "../ui/AmountField";
+import { BreakdownEditor, type BreakdownPart } from "./BreakdownEditor";
 
 /** Deuda mami, the card and what mom sends (an income) have their own places in the app. */
 type Place = Extract<PocketId, "banorte" | "cajita" | "efectivo" | "bbva">;
@@ -59,8 +60,12 @@ export function TransferForm() {
   const [from, setFrom] = useState<Place>(isSimple ? "bbva" : "banorte");
   const [to, setTo] = useState<Place>(isSimple ? "efectivo" : "cajita");
 
+  const [parts, setParts] = useState<BreakdownPart[]>([]);
+
   const amount = parseMoneyInput(amountText);
   const canSubmit = amount !== null && amount > 0;
+  // Taking cash out of BBVA is the one move with something to account for: what it paid for.
+  const isWithdrawal = isSimple && from === "bbva" && to === "efectivo";
 
   // Picking a place that the other side already uses swaps them, so they never match.
   const pickFrom = (next: Place) => {
@@ -76,17 +81,34 @@ export function TransferForm() {
     event.preventDefault();
     if (!canSubmit || amount === null) return;
 
+    const movement = {
+      date: today,
+      type: "transfer" as const,
+      amount,
+      from,
+      to,
+      category: null,
+      note: isWithdrawal ? "Retiro de efectivo" : "",
+      dataKind: "real" as const,
+    };
+    const spent = isWithdrawal ? parts : [];
     void runAction(`Guardado: ${formatMoney(amount)}`, () =>
-      addMovement({
-        date: today,
-        type: "transfer",
-        amount,
-        from,
-        to,
-        category: null,
-        note: "",
-        dataKind: "real",
-      }),
+      spent.length === 0
+        ? addMovement(movement)
+        : addMovementWithBreakdown(
+            movement,
+            // The cash is spent from the pocket the withdrawal filled.
+            spent.map((part) => ({
+              date: today,
+              type: "expense" as const,
+              amount: part.amount,
+              from: "efectivo" as const,
+              to: null,
+              category: part.category,
+              note: part.note,
+              dataKind: "real" as const,
+            })),
+          ),
     );
     router.push("/");
   };
@@ -96,6 +118,14 @@ export function TransferForm() {
       <AmountField label="Monto" value={amountText} onChange={setAmountText} size="large" />
       <Choice label="De" options={sources} value={from} onChange={pickFrom} />
       <Choice label="A" options={targets} value={to} onChange={pickTo} />
+      {isWithdrawal ? (
+        <BreakdownEditor
+          title="¿En qué se gastó este efectivo? (opcional)"
+          total={amount}
+          parts={parts}
+          onChange={setParts}
+        />
+      ) : null}
       <p className="amount text-sm text-ink-soft">
         En {ENDPOINT_LABELS[from]} hay {formatMoney(dashboard.balances[from])}.
       </p>

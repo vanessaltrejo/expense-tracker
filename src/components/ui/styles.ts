@@ -25,6 +25,10 @@ const CATEGORY_ICONS: Record<string, string> = {
   otros: "📦",
   pendiente: "⏳",
   "no sé": "❓",
+  préstamo: "🤝",
+  mesada: "💵",
+  estacionamiento: "🅿️",
+  aparte: "📌",
   bread: "🥐",
   dates: "💞",
   gym: "🏋️",
@@ -85,3 +89,13 @@ export function getUsageTone(percent: number): { bar: string; text: string } {
   if (percent >= 30) return { bar: "bg-warning", text: "text-warning" };
   return { bar: "bg-good", text: "text-good" };
 }
+
+/** Quick action buttons on Home, one vivid color each so they are told apart at a glance. */
+export const ACTION_TONES = {
+  expense: "from-[#d9730d] to-[#f5a623]",
+  income: "from-[#0a8f6d] to-[#19b58b]",
+  move: "from-[#0b73a8] to-[#1fb0c9]",
+} as const;
+
+export const ACTION_TILE =
+  "flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-2xl bg-linear-135 p-2 text-center text-xs font-semibold text-white shadow-md active:opacity-85";

@@ -8,7 +8,7 @@ import { PENDING_CATEGORY } from "@/data/seedData";
 import { moveBanorteToCajita } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
 import { PeriodBar } from "../ui/PeriodBar";
-import { POCKET_STYLES } from "../ui/styles";
+import { ACTION_TILE, ACTION_TONES, POCKET_STYLES } from "../ui/styles";
 import { MomDebtCard } from "./MomDebtCard";
 import { SimpleHome } from "./SimpleHome";
 import { PocketsDetails } from "./PocketsDetails";
@@ -16,9 +16,9 @@ import { UpcomingCharges } from "./UpcomingCharges";
 import { YieldCard } from "./YieldCard";
 
 const QUICK_ACTIONS = [
-  { href: "/agregar", icon: "▭", label: "Agregar gasto", tone: "bg-tarjeta-soft text-tarjeta" },
-  { href: "/agregar?tipo=pago", icon: "✓", label: "Pagar tarjeta", tone: "bg-good-soft text-good" },
-  { href: "/agregar?tipo=mover", icon: "⇄", label: "Mover dinero", tone: "bg-cajita-soft text-cajita" },
+  { href: "/agregar", icon: "▭", label: "Agregar gasto", tone: ACTION_TONES.expense },
+  { href: "/agregar?tipo=pago", icon: "✓", label: "Pagar tarjeta", tone: ACTION_TONES.income },
+  { href: "/agregar?tipo=mover", icon: "⇄", label: "Mover dinero", tone: ACTION_TONES.move },
 ];
 
 function signed(amount: number): string {
@@ -43,9 +43,9 @@ function HeroBalance() {
       className="rounded-3xl bg-linear-135 from-hero-from to-hero-to p-5 text-white shadow-md"
     >
       <p className="text-sm text-white/80 first-letter:uppercase">{formatLongDate(today)}</p>
-      <h1 id="hero-label" className="mt-3 text-base font-medium text-white/90">
+      <h2 id="hero-label" className="mt-3 text-base font-medium text-white/90">
         Debes en la tarjeta
-      </h1>
+      </h2>
       <p className="amount mt-0.5 text-[2.75rem] leading-tight font-semibold tracking-tight">
         {formatMoney(debt)}
       </p>
@@ -91,21 +91,20 @@ function FullHome() {
 
   return (
     <>
+      <h1 className="px-1 text-2xl font-semibold">Inicio</h1>
       <PeriodBar />
       <HeroBalance />
-      <MomDebtCard />
-
       {canEdit ? (
         <nav aria-label="Acciones rápidas" className="grid grid-cols-3 gap-2">
           {QUICK_ACTIONS.map((action) => (
             <Link
               key={action.href}
               href={action.href}
-              className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-2xl bg-surface p-2 text-center text-xs font-semibold active:opacity-80"
+              className={`${ACTION_TILE} ${action.tone}`}
             >
               <span
                 aria-hidden="true"
-                className={`flex size-9 items-center justify-center rounded-full text-lg ${action.tone}`}
+                className="flex size-9 items-center justify-center rounded-full bg-white/20 text-lg"
               >
                 {action.icon}
               </span>
@@ -114,6 +113,7 @@ function FullHome() {
           ))}
         </nav>
       ) : null}
+      <MomDebtCard />
 
       {canEdit && pending.length > 0 ? (
         <section className="card bg-warning-soft">

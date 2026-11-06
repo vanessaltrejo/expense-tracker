@@ -302,17 +302,25 @@ Francisco no usa tarjeta de crédito, cajita ni Deuda mami. Tiene **una cuenta d
 - **Transferí**: dinero que le manda a otra persona (Vanessa, Mamá, Papá u otra que escriba). Sale de su BBVA pero **no cuenta como gasto**; en el Resumen aparece aparte como "Enviaste a otras personas". Las personas a las que ya mandó salen después como botones.
 - Atajos con un toque: bread de pan de chocolate, snacks de 7-Eleven, gym day pass, corte de pelo y gasolina (la primera vez piden el precio).
 
-**Categorías de gasto:** dates, salidas, antojos de Vane, antojos míos, snacks, bread, gym, higiene, gasolina, cortes de pelo, shopping, otros y pendiente. **Ingresos:** mamá, papá y otros. Para no saturar, el formulario muestra primero las **6 más usadas** y el resto queda detrás de "Ver todas".
+**Categorías de gasto:** dates, salidas, antojos de Vane, antojos míos, snacks, bread, gym, higiene, gasolina, cortes de pelo, shopping y otros. **Ingresos:** mamá, papá y otros. Se muestran como **cuadritos con ícono**, cuatro por fila: primero las **7 más usadas** y el resto queda detrás de "Más". "Pendiente" ya no se ofrece al agregar (los gastos viejos que la tengan siguen avisando en Inicio).
 
 > **Por qué "salidas" y "dates" son distintas:** "dates" es salir los dos; "salidas" es con amigos, incluso si él paga por los dos. Y "antojos de Vane" separa lo que él le compra a ella de sus propios antojos.
 
 **Lugares.** Debajo de la categoría, en las que lo piden (dates, salidas, antojos y snacks, bread), aparece una fila de botones con lugares frecuentes: Shake Shack, Galleta Moonwalk, Carl's Jr, Wingstop, Super Salads, Elite Cinema y Cinépolis.
-- Los más usados salen primero y solo se ven 8.
+- Los más usados salen primero, en **una sola fila que se desliza de lado** (solo se ven 8), para no alargar el formulario.
 - Puede **escribir otro lugar** ahí mismo; si lo escribe dos veces, se vuelve botón.
 - El lugar se guarda en la **Nota** del movimiento. La lista y las categorías que piden lugar viven en las columnas L y M de Ajustes.
 - Con eso, el Resumen e Inicio muestran **dónde más gasta**, y el Historial se filtra por lugar.
 
 > **Por qué lugares como botones y no texto libre:** si escribiera "Shake Shack" de tres formas distintas, no se podría sumar. Los botones mantienen el nombre igual y ahorran escribir.
+
+**Préstamos a familiares.** En **Transferí** hay dos opciones: **Le di dinero** y **Me regresaron**. Al dar dinero se elige el **motivo** (*Préstamo*, que me lo van a regresar, o *Sin regreso*, regalo o apoyo) y **cómo** se dio (transferencia desde BBVA o efectivo). Un préstamo se guarda como una transferencia con categoría **préstamo**; cuando lo regresan, se anota con "Me regresaron" y baja lo que esa persona debe. Nada de esto cuenta como gasto ni como ingreso. Inicio muestra **Te deben**, con el total y lo que debe cada persona.
+
+**Meses anteriores.** En Historial y Resumen, el selector de mes de Francisco lista el mes actual y cada mes anterior que tenga movimientos. Un saldo inicial solo no abre un mes. Inicio siempre muestra el mes actual. En la versión completa (tarjeta) sigue siendo solo el periodo actual.
+
+**Desglose (el "ticket").** Un movimiento del banco, como un retiro de efectivo o una transferencia sin regreso, puede traer debajo lo que pagó: cada parte tiene monto, categoría y lugar o detalle. Se crea desde **Mover** (de BBVA a efectivo) y **Transferí** (sin regreso). Las partes cuentan como gasto en el Resumen y la fila del banco no, para no duplicar; además la fila no aparece en "Enviaste a otras personas". No tienen que sumar el total. En el Sheets las partes llevan el ID del movimiento más un punto y un número (`P3.1`, `P3.2`).
+
+**Lugares por categoría.** La columna N de Ajustes dice en qué categorías sale cada lugar (separadas por comas; vacía = en todas las que piden lugar). El lugar y el detalle comparten la nota: `HEB · Higiene personal` cuenta para HEB.
 
 **Su Sheets** muestra solo **Movimientos, Atajos, Ajustes y Resumen del mes**. Gastos fijos, Pagos esperados y Cortes existen pero están escondidos, porque la app los usa por dentro. Su Resumen del mes trae: gasto por categoría (este mes contra el pasado), lo que entró, lo que gastó, lo que envió a otras personas y su saldo en BBVA, en efectivo y en total.
 

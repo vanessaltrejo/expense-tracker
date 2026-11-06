@@ -12,6 +12,7 @@ import {
 
 import { buildDashboard, type Dashboard } from "@/domain/dashboard";
 import { getTodayInMexico } from "@/domain/dates";
+import { getPeriodForDate, getPeriodsWithData, type Period } from "@/domain/periods";
 import type { AppData, IsoDate } from "@/domain/types";
 import { canEdit as roleCanEdit, type SessionUser } from "@/domain/users";
 import { switchRepositoryTo } from "@/services/financeRepository";
@@ -27,6 +28,15 @@ interface FinanceContextValue {
   data: AppData;
   today: IsoDate;
   dashboard: Dashboard;
+  /**
+   * The period History and Summary are showing: the current one unless an earlier one was
+   * picked. Home always shows the current period.
+   */
+  viewPeriod: Period;
+  /** Every period worth looking at, newest first. */
+  periods: Period[];
+  /** Picks the period to look at; null goes back to the current one. */
+  selectPeriod: (period: Period | null) => void;
   toast: Toast | null;
   /** Runs a change, reloads the data, and offers to undo it when `undo` comes back. */
   runAction: (
@@ -66,6 +76,7 @@ export function FinanceProvider({
   );
   const [loadFailed, setLoadFailed] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
+  const [viewStart, setViewStart] = useState<IsoDate | null>(null);
   const [syncState, setSyncState] = useState<SyncState>({ status: "idle" });
 
   const refresh = useCallback(async () => {
@@ -144,10 +155,18 @@ export function FinanceProvider({
 
   const value = useMemo<FinanceContextValue | null>(() => {
     if (!loaded) return null;
+    const periods = getPeriodsWithData(loaded.data.movements, loaded.data.settings, loaded.today);
+    // A period that no longer has data (rows deleted) falls back to the current one.
+    const viewPeriod =
+      periods.find((period) => period.start === viewStart) ??
+      getPeriodForDate(loaded.today, loaded.data.settings);
     return {
       data: loaded.data,
       today: loaded.today,
       dashboard: buildDashboard(loaded.data, loaded.today),
+      viewPeriod,
+      periods,
+      selectPeriod: (period) => setViewStart(period ? period.start : null),
       toast,
       runAction,
       undoToast,
@@ -157,7 +176,7 @@ export function FinanceProvider({
       user,
       canEdit,
     };
-  }, [loaded, toast, runAction, undoToast, dismissToast, syncState, syncNow, user, canEdit]);
+  }, [loaded, viewStart, toast, runAction, undoToast, dismissToast, syncState, syncNow, user, canEdit]);
 
   const loadState = useMemo(
     () => ({ loadFailed, retry: refresh }),

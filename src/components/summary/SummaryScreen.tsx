@@ -12,9 +12,13 @@ import { formatCategory, getCategoryIcon } from "../ui/styles";
 import { CategoryChart } from "./CategoryChart";
 
 export function SummaryScreen() {
-  const { data, today, user } = useFinance();
-  const when = user.layout === "simple" ? "este mes" : "este periodo";
-  const summary = useMemo(() => buildPeriodSummary(data, today), [data, today]);
+  const { data, today, user, viewPeriod, dashboard } = useFinance();
+  const isSimple = user.layout === "simple";
+  // Only the simple layout can look at an earlier month; the card layout is always current.
+  const period = isSimple ? viewPeriod : dashboard.period;
+  const isCurrent = period.start === dashboard.period.start;
+  const when = isSimple ? (isCurrent ? "este mes" : "ese mes") : "este periodo";
+  const summary = useMemo(() => buildPeriodSummary(data, today, period), [data, today, period]);
   const hasSpending = summary.expenseCount > 0;
   const topPlaces = useMemo(
     () => getTopPlaces(data.movements, data.settings, summary.period, 5),
@@ -28,7 +32,7 @@ export function SummaryScreen() {
   return (
     <>
       <h1 className="px-1 text-2xl font-semibold">Resumen</h1>
-      <PeriodBar />
+      <PeriodBar selectable />
 
       <section className="card">
         <h2 className="card-title">Gastaste {when}</h2>

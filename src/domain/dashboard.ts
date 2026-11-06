@@ -181,8 +181,12 @@ function isSpending(movement: Movement): boolean {
   return movement.type === "expense" || movement.type === "cardExpense";
 }
 
-export function buildPeriodSummary(data: AppData, today: IsoDate): PeriodSummary {
-  const period = getPeriodForDate(today, data.settings);
+/** The summary of the current period, or of an earlier one when `period` is given. */
+export function buildPeriodSummary(
+  data: AppData,
+  today: IsoDate,
+  period: Period = getPeriodForDate(today, data.settings),
+): PeriodSummary {
   // Rows older than an opening balance still count here: only balances ignore them.
   const inPeriod = data.movements.filter(
     (movement) =>

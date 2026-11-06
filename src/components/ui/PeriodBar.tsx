@@ -7,13 +7,17 @@ import { formatPeriodRange } from "@/domain/periods";
 import { useFinance } from "../FinanceProvider";
 
 /**
- * Shows which card period the screen is about, with a button to change it. For now the
- * current period is the only one with complete information, so the list has just that one.
+ * Shows which period the screen is about, with a button to change it. Earlier periods can
+ * be picked only where `selectable` is set and in the simple layout (calendar months with
+ * their own movements); in the card layout the current period is the only one with
+ * complete information.
  */
-export function PeriodBar() {
-  const { dashboard, user } = useFinance();
+export function PeriodBar({ selectable = false }: { selectable?: boolean }) {
+  const { dashboard, user, viewPeriod, periods, selectPeriod } = useFinance();
   const isSimple = user.layout === "simple";
-  const { period } = dashboard;
+  const canPick = selectable && isSimple && periods.length > 1;
+  const period = canPick ? viewPeriod : dashboard.period;
+  const isCurrent = period.start === dashboard.period.start;
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -30,14 +34,38 @@ export function PeriodBar() {
           <span className="block font-semibold">{formatPeriodRange(period)}</span>
         </span>
         <span className="flex shrink-0 items-center gap-2 text-xs text-ink-soft">
-          {isSimple ? "" : `Se paga el ${formatShortDate(period.dueDate)}`}
+          {isSimple ? (isCurrent ? "" : "Mes anterior") : `Se paga el ${formatShortDate(period.dueDate)}`}
           <span aria-hidden="true" className={`transition-transform ${isOpen ? "rotate-180" : ""}`}>
             ▾
           </span>
         </span>
       </button>
 
-      {isOpen ? (
+      {isOpen && canPick ? (
+        <div id="period-list" className="card mt-2 gap-2">
+          {periods.map((item) => {
+            const isChosen = item.start === period.start;
+            return (
+              <button
+                key={item.start}
+                type="button"
+                aria-pressed={isChosen}
+                className="chip justify-between rounded-xl"
+                onClick={() => {
+                  selectPeriod(item.start === dashboard.period.start ? null : item);
+                  setIsOpen(false);
+                }}
+              >
+                <span>{formatPeriodRange(item)}</span>
+                <span className="text-xs font-medium">
+                  {item.start === dashboard.period.start ? "Actual" : ""}
+                  {isChosen ? " ✓" : ""}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : isOpen ? (
         <div id="period-list" className="card mt-2 gap-2">
           <p className="flex items-center justify-between gap-3 rounded-xl bg-accent-soft px-3 py-2.5 text-sm font-semibold text-accent">
             <span>{formatPeriodRange(period)}</span>

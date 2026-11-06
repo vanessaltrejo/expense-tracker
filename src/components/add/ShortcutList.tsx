@@ -143,9 +143,9 @@ export function ShortcutList() {
         />
       ) : null}
 
-      <ul className="grid grid-cols-2 gap-2">
+      <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {data.shortcuts.map((shortcut) => (
-          <li key={shortcut.id} className="flex">
+          <li key={shortcut.id} className="flex w-44 shrink-0">
             <button
               type="button"
               className={`flex min-h-18 w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left active:bg-page ${

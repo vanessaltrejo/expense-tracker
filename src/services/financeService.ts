@@ -1,3 +1,5 @@
+import { partId } from "@/domain/breakdown";
+import { createId } from "@/domain/ids";
 import { generateExpectedCharges } from "@/domain/recurring";
 import type {
   AppData,
@@ -45,6 +47,22 @@ export async function addMovement(draft: MovementDraft): Promise<Undo> {
   return undoMovements(await repository.current.addMovements([draft]));
 }
 
+/**
+ * A bank movement with its breakdown, saved together so they can't end up apart. Each
+ * part is named after the movement ("id.1", "id.2"…), which is how the app finds them.
+ */
+export async function addMovementWithBreakdown(
+  movement: MovementDraft,
+  parts: MovementDraft[],
+): Promise<Undo> {
+  const id = createId("m");
+  const created = await repository.current.addMovements([
+    { ...movement, id },
+    ...parts.map((part, index) => ({ ...part, id: partId(id, index + 1) })),
+  ]);
+  return undoMovements(created);
+}
+
 export async function changeMovementCategory(
   movement: Movement,
   category: string,
@@ -53,9 +71,11 @@ export async function changeMovementCategory(
   return () => repository.current.updateMovement(movement);
 }
 
-export async function deleteMovement(movement: Movement): Promise<Undo> {
-  await repository.current.deleteMovements([movement.id]);
-  return () => repository.current.restoreMovements([movement]);
+/** Deleting a movement takes its breakdown with it, so no orphan parts are left behind. */
+export async function deleteMovement(movement: Movement, parts: Movement[] = []): Promise<Undo> {
+  const removed = [movement, ...parts];
+  await repository.current.deleteMovements(removed.map((item) => item.id));
+  return () => repository.current.restoreMovements(removed);
 }
 
 function toSpendingDraft(input: {
