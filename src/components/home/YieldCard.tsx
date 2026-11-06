@@ -25,23 +25,32 @@ export function YieldCard() {
         </p>
       </div>
 
-      <label className="field-label">
-        Tu día de pago (antes del {formatShortDate(card.dueDate)})
-        <input
-          className="field"
-          type="date"
-          min={today}
-          disabled={!canEdit}
-          max={addDays(card.dueDate, -1)}
-          value={plan.plannedDate}
-          onChange={(event) => {
-            const plannedDate = event.target.value || null;
-            void runAction("Día de pago actualizado", () =>
-              savePaymentPlan({ plannedDate }),
-            );
-          }}
-        />
-      </label>
+      {/* Read-only viewers see the day as plain, prominent text: a box would look editable. */}
+      {canEdit ? (
+        <label className="field-label">
+          Tu día de pago (antes del {formatShortDate(card.dueDate)})
+          <input
+            className="field"
+            type="date"
+            min={today}
+            max={addDays(card.dueDate, -1)}
+            value={plan.plannedDate}
+            onChange={(event) => {
+              const plannedDate = event.target.value || null;
+              void runAction("Día de pago actualizado", () =>
+                savePaymentPlan({ plannedDate }),
+              );
+            }}
+          />
+        </label>
+      ) : (
+        <div className="flex flex-col gap-0.5">
+          <p className="text-sm font-medium text-ink-soft">
+            Tu día de pago (antes del {formatShortDate(card.dueDate)})
+          </p>
+          <p className="amount text-xl font-semibold">{formatShortDate(plan.plannedDate)}</p>
+        </div>
+      )}
 
       {dashboard.yieldThisPeriod !== 0 ? (
         <p className="amount text-sm">

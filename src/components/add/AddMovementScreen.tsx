@@ -20,22 +20,6 @@ const TABS: { id: AddTab; icon: string; label: string; param: string }[] = [
   { id: "send", icon: "↗", label: "Transferí", param: "enviar" },
 ];
 
-const TAB_HELP: Record<AddTab, string> = {
-  expense: "Algo que pagaste. Casi siempre es con tu Tarjeta Nu crédito, y eso sube tu deuda.",
-  income: "Dinero que te llegó: horno³, comedor, tu mamá u otros. Lo de tu mamá siempre cae en Banorte.",
-  transfer:
-    "Mover dinero entre tus bolsas. No es un gasto.",
-  payment: "Lo que abonaste a la tarjeta, siempre de tu Cajita Nu Débito. Puedes pagar en varias partes.",
-  send: "",
-};
-
-const SIMPLE_TAB_HELP: Partial<Record<AddTab, string>> = {
-  expense: "Algo que gastaste, con tu BBVA o con efectivo.",
-  income: "Dinero que te depositaron: tu mamá, tu papá u otros.",
-  transfer: "Mover dinero entre tu BBVA y tu efectivo, por ejemplo cuando sacas del cajero. No es un gasto.",
-  send: "Dinero que le diste a un familiar, en efectivo o por transferencia, o que te regresaron. No cuenta como gasto. Si es préstamo, la app te dice cuánto te deben.",
-};
-
 function AddMovementContent({ initialTab }: { initialTab: AddTab }) {
   const { user } = useFinance();
   const isSimple = user.layout === "simple";
@@ -48,7 +32,7 @@ function AddMovementContent({ initialTab }: { initialTab: AddTab }) {
 
   return (
     <>
-      <h1 className="px-1 text-2xl font-semibold">Agregar</h1>
+      <h1 className="flex h-14 items-center px-1 text-2xl font-semibold">Agregar</h1>
 
       <div
         role="radiogroup"
@@ -69,10 +53,6 @@ function AddMovementContent({ initialTab }: { initialTab: AddTab }) {
           </button>
         ))}
       </div>
-      <p className="-mt-1 px-1 text-sm text-ink-soft">
-        {(isSimple && SIMPLE_TAB_HELP[tab]) || TAB_HELP[tab]}
-      </p>
-
       {tab === "expense" ? <ShortcutList /> : null}
       {tab === "payment" ? <PaymentForm /> : null}
       {tab === "transfer" ? <TransferForm /> : null}

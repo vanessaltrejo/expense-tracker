@@ -21,7 +21,7 @@ export function ProfileScreen() {
 
   return (
     <>
-      <h1 className="px-1 text-2xl font-semibold">Perfil</h1>
+      <h1 className="flex h-14 items-center px-1 text-2xl font-semibold">Perfil</h1>
 
       <section className="card flex-row items-center gap-4 py-4">
         <Avatar name={user.name} tone={user.tone} size={64} />

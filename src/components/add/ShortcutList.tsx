@@ -15,6 +15,9 @@ import { useFinance } from "../FinanceProvider";
 import { AmountField } from "../ui/AmountField";
 import { getCategoryIcon } from "../ui/styles";
 
+/** Three per row, two rows before "Más". */
+const VISIBLE = 6;
+
 type Editing =
   | { mode: "price"; shortcut: Shortcut }
   | { mode: "edit"; shortcut: Shortcut };
@@ -99,8 +102,13 @@ export function ShortcutList() {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [editing, setEditing] = useState<Editing | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   if (data.shortcuts.length === 0) return null;
+
+  // Two rows of three fit without scrolling; with more, "Más" opens the rest in place.
+  const isCrowded = data.shortcuts.length > VISIBLE;
+  const shown = isCrowded && !expanded ? data.shortcuts.slice(0, VISIBLE - 1) : data.shortcuts;
 
   const handleTap = (shortcut: Shortcut) => {
     if (isEditing) {
@@ -143,28 +151,41 @@ export function ShortcutList() {
         />
       ) : null}
 
-      <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {data.shortcuts.map((shortcut) => (
-          <li key={shortcut.id} className="flex w-44 shrink-0">
+      <ul className="grid grid-cols-3 gap-2">
+        {shown.map((shortcut) => (
+          <li key={shortcut.id} className="flex">
             <button
               type="button"
-              className={`flex min-h-18 w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left active:bg-page ${
-                isEditing ? "border-dashed border-accent" : "border-line"
-              }`}
+              className={`tile w-full ${isEditing ? "border-dashed border-accent" : ""}`}
               onClick={() => handleTap(shortcut)}
             >
-              <span aria-hidden="true" className="text-xl">
+              <span aria-hidden="true" className="text-2xl leading-none">
                 {getCategoryIcon(shortcut.category)}
               </span>
-              <span className="min-w-0">
-                <span className="block text-sm leading-tight font-medium">{shortcut.name}</span>
-                <span className="amount block text-sm text-ink-soft">
-                  {shortcut.amount === null ? "Poner precio" : formatMoney(shortcut.amount)}
-                </span>
+              <span className="line-clamp-2 w-full text-[0.6875rem] leading-tight wrap-break-word">
+                {shortcut.name}
+              </span>
+              <span className="amount text-xs font-normal text-ink-soft">
+                {shortcut.amount === null ? "Poner precio" : formatMoney(shortcut.amount)}
               </span>
             </button>
           </li>
         ))}
+        {isCrowded ? (
+          <li className="flex">
+            <button
+              type="button"
+              aria-expanded={expanded}
+              className="tile w-full text-ink-soft"
+              onClick={() => setExpanded(!expanded)}
+            >
+              <span aria-hidden="true" className="text-2xl leading-none">
+                {expanded ? "▴" : "⋯"}
+              </span>
+              <span className="text-[0.6875rem] leading-tight">{expanded ? "Menos" : "Más"}</span>
+            </button>
+          </li>
+        ) : null}
       </ul>
     </section>
   );

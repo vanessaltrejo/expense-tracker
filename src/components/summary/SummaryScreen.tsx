@@ -21,7 +21,7 @@ export function SummaryScreen() {
   const summary = useMemo(() => buildPeriodSummary(data, today, period), [data, today, period]);
   const hasSpending = summary.expenseCount > 0;
   const topPlaces = useMemo(
-    () => getTopPlaces(data.movements, data.settings, summary.period, 5),
+    () => getTopPlaces(data.movements, data.settings, summary.period, 4),
     [data.movements, data.settings, summary.period],
   );
   const sent = useMemo(
@@ -31,8 +31,7 @@ export function SummaryScreen() {
 
   return (
     <>
-      <h1 className="px-1 text-2xl font-semibold">Resumen</h1>
-      <PeriodBar selectable />
+      <PeriodBar title="Resumen" selectable />
 
       <section className="card">
         <h2 className="card-title">Gastaste {when}</h2>
@@ -50,7 +49,7 @@ export function SummaryScreen() {
           </section>
 
           <section className="card">
-            <h2 className="card-title">Lo más grande</h2>
+            <h2 className="card-title">Top 4 gastos</h2>
             <ul className="flex flex-col gap-3">
               {summary.largest.map((movement) => (
                 <li key={movement.id} className="flex items-baseline justify-between gap-3">
@@ -111,7 +110,7 @@ export function SummaryScreen() {
         </section>
       ) : null}
 
-      {summary.income > 0 ? (
+      {!isSimple && summary.income > 0 ? (
         <section className="card">
           <h2 className="card-title">Te entró {when}</h2>
           <p className="amount -mt-2 text-2xl font-semibold text-good">

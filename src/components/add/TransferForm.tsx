@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 
 import { ENDPOINT_LABELS } from "@/domain/ledger";
+import { gaveNote, isPersonNote, personOf } from "@/domain/loans";
 import { formatMoney, parseMoneyInput } from "@/domain/money";
 import type { PocketId } from "@/domain/types";
 import { addMovement, addMovementWithBreakdown } from "@/services/financeService";
@@ -50,7 +51,7 @@ function Choice({
 }
 
 /** Moves money between your places: an amount, where it leaves and where it lands. */
-export function TransferForm() {
+function OwnTransferForm() {
   const { dashboard, today, runAction, user } = useFinance();
   const isSimple = user.layout === "simple";
   const sources = isSimple ? SIMPLE_PLACES : SOURCES;
@@ -133,5 +134,139 @@ export function TransferForm() {
         Guardar
       </button>
     </form>
+  );
+}
+
+/** Who the card layout sends money to most. Others can be typed, and are remembered. */
+const DEFAULT_PEOPLE = ["Mamá", "Francisco", "Roberto"];
+const PERSON_SOURCES: Place[] = ["banorte", "cajita", "efectivo"];
+
+/**
+ * Money that goes to another person: it leaves one of your places and isn't spending, so
+ * it shows under "Enviaste a otras personas" in the Summary, not in the categories.
+ */
+function PersonTransferForm() {
+  const { data, dashboard, today, runAction } = useFinance();
+  const router = useRouter();
+  const [amountText, setAmountText] = useState("");
+  const [person, setPerson] = useState<string | null>(null);
+  const [other, setOther] = useState("");
+  const [from, setFrom] = useState<Place>("banorte");
+
+  const people = [...DEFAULT_PEOPLE];
+  for (const movement of data.movements) {
+    if (movement.type !== "transfer" || movement.to !== null || movement.from === null) continue;
+    if (!isPersonNote(movement.note)) continue;
+    const name = personOf(movement.note);
+    if (name !== "" && !people.some((known) => known.toLowerCase() === name.toLowerCase())) {
+      people.push(name);
+    }
+  }
+
+  const amount = parseMoneyInput(amountText);
+  const recipient = (person ?? other).trim();
+  const canSubmit = amount !== null && amount > 0 && recipient !== "";
+
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!canSubmit || amount === null) return;
+    void runAction(`Enviaste ${formatMoney(amount)} a ${recipient}`, () =>
+      addMovement({
+        date: today,
+        type: "transfer",
+        amount,
+        from,
+        to: null,
+        category: null,
+        note: gaveNote(recipient),
+        dataKind: "real",
+      }),
+    );
+    router.push("/");
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="card gap-4">
+      <AmountField label="Monto" value={amountText} onChange={setAmountText} size="large" />
+
+      <fieldset className="flex min-w-0 flex-col gap-2">
+        <legend className="mb-1.5 text-sm font-medium text-ink-soft">¿A quién?</legend>
+        <div className="flex flex-wrap gap-2">
+          {people.map((name) => (
+            <button
+              key={name}
+              type="button"
+              aria-pressed={person === name}
+              className="chip"
+              onClick={() => {
+                setPerson(person === name ? null : name);
+                setOther("");
+              }}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+        <input
+          className="field"
+          type="text"
+          aria-label="Otra persona"
+          placeholder="O escribe otra persona"
+          value={other}
+          onChange={(event) => {
+            setOther(event.target.value);
+            setPerson(null);
+          }}
+        />
+      </fieldset>
+
+      <Choice label="¿De dónde sale?" options={PERSON_SOURCES} value={from} onChange={setFrom} />
+      <p className="amount text-sm text-ink-soft">
+        En {ENDPOINT_LABELS[from]} hay {formatMoney(dashboard.balances[from])}.
+      </p>
+
+      <button type="submit" className="btn-primary" disabled={!canSubmit}>
+        Guardar
+      </button>
+    </form>
+  );
+}
+
+/**
+ * The card layout can also send money to someone, so it first asks which kind of move this
+ * is. The simple layout only moves between BBVA and cash; its person sends live in Transferí.
+ */
+export function TransferForm() {
+  const { user } = useFinance();
+  const [mode, setMode] = useState<"own" | "person">("own");
+
+  if (user.layout === "simple") return <OwnTransferForm />;
+
+  return (
+    <>
+      <div role="radiogroup" aria-label="Tipo de movimiento de dinero" className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={mode === "own"}
+          className="tile"
+          onClick={() => setMode("own")}
+        >
+          <span aria-hidden="true" className="text-2xl leading-none">⇄</span>
+          <span className="text-sm">Entre mis bolsas</span>
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={mode === "person"}
+          className="tile"
+          onClick={() => setMode("person")}
+        >
+          <span aria-hidden="true" className="text-2xl leading-none">↗</span>
+          <span className="text-sm">A una persona</span>
+        </button>
+      </div>
+      {mode === "own" ? <OwnTransferForm /> : <PersonTransferForm />}
+    </>
   );
 }

@@ -162,7 +162,7 @@ describe("periods", () => {
       [["escuela", pesos(600)], ["salidas", pesos(300)], ["comida", pesos(150)]],
     );
     assert.equal(Math.round(summary.categories[0].share * 100), 57);
-    assert.deepEqual(summary.largest.map((item) => item.note), ["Viaje", "Salida", "Comida"]);
+    assert.deepEqual(summary.largest.map((item) => item.note), ["Viaje", "Salida", "Comida", "Más comida"]);
     // The 999 from before the cut belongs to the previous period, and income is kept apart.
     assert.equal(summary.income, pesos(1_200));
   });

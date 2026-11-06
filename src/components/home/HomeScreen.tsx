@@ -91,8 +91,7 @@ function FullHome() {
 
   return (
     <>
-      <h1 className="px-1 text-2xl font-semibold">Inicio</h1>
-      <PeriodBar />
+      <PeriodBar title="Inicio" />
       <HeroBalance />
       {canEdit ? (
         <nav aria-label="Acciones rápidas" className="grid grid-cols-3 gap-2">

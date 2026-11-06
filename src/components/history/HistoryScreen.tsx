@@ -62,10 +62,10 @@ function getSign(movement: Movement): string {
 }
 
 /** Splits a list already sorted from newest to oldest into one group per day. */
-const KIND_OPTIONS: { id: HistoryKind; label: string }[] = [
-  { id: "all", label: "Todo" },
-  { id: "expenses", label: "Gastos" },
-  { id: "income", label: "Ingresos" },
+const KIND_OPTIONS: { id: HistoryKind; icon: string; label: string }[] = [
+  { id: "all", icon: "⇅", label: "Todo" },
+  { id: "expenses", icon: "↑", label: "Gastos" },
+  { id: "income", icon: "↓", label: "Ingresos" },
 ];
 
 function groupByDay(movements: Movement[]): { date: string; movements: Movement[] }[] {
@@ -136,7 +136,7 @@ function MovementRow({
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
-          className={`flex size-10 shrink-0 items-center justify-center rounded-full text-lg ${TYPE_STYLES[movement.type].soft}`}
+          className={`flex size-10 shrink-0 items-center justify-center rounded-full text-lg ${movement.type === "cardExpense" ? TYPE_STYLES.expense.soft : TYPE_STYLES[movement.type].soft}`}
         >
           {movement.category ? getCategoryIcon(movement.category) : (
             <span className={TYPE_STYLES[movement.type].text}>{TYPE_STYLES[movement.type].icon}</span>
@@ -174,11 +174,7 @@ function MovementRow({
           ) : null}
         </div>
         <div className="flex shrink-0 flex-col items-end">
-          <p
-            className={`amount font-semibold ${
-              movement.type === "income" ? "text-good" : ""
-            }`}
-          >
+          <p className="amount font-semibold">
             {getSign(movement)}
             {formatMoney(movement.amount)}
           </p>
@@ -276,8 +272,7 @@ export function HistoryScreen() {
 
   return (
     <>
-      <h1 className="px-1 text-2xl font-semibold">Historial</h1>
-      <PeriodBar selectable />
+      <PeriodBar title="Historial" selectable />
 
       <div role="radiogroup" aria-label="Qué mostrar" className="grid grid-cols-3 gap-2">
         {KIND_OPTIONS.map((option) => (
@@ -286,35 +281,54 @@ export function HistoryScreen() {
             type="button"
             role="radio"
             aria-checked={kind === option.id}
-            className="chip"
+            className="chip gap-1.5"
             onClick={() => {
               setKind(option.id);
               // A category from the other group wouldn't match anything.
               setCategory("");
             }}
           >
-            {option.label}
+            <span aria-hidden="true">{option.icon}</span>
+            <span>{option.label}</span>
           </button>
         ))}
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        {(
-        <label className="field-label">
-          Bolsa
-          <select
-            className="field"
-            value={endpoint}
-            onChange={(event) => setEndpoint(event.target.value)}
-          >
-            <option value="">Todas</option>
-            {(isSimple ? SIMPLE_ENDPOINTS : ENDPOINTS).map((item) => (
-              <option key={item} value={item}>
-                {ENDPOINT_LABELS[item]}
-              </option>
-            ))}
-          </select>
-        </label>
+        {isSimple ? (
+          // With only two places, chips say it at a glance and leave the row below for the rest.
+          <div role="radiogroup" aria-label="Bolsa" className="col-span-2 grid grid-cols-3 gap-2">
+            {[{ id: "", label: "Todas" }, ...SIMPLE_ENDPOINTS.map((item) => ({ id: item, label: ENDPOINT_LABELS[item] }))].map(
+              (option) => (
+                <button
+                  key={option.id || "all"}
+                  type="button"
+                  role="radio"
+                  aria-checked={endpoint === option.id}
+                  className="chip"
+                  onClick={() => setEndpoint(option.id)}
+                >
+                  {option.label}
+                </button>
+              ),
+            )}
+          </div>
+        ) : (
+          <label className="field-label">
+            Bolsa
+            <select
+              className="field"
+              value={endpoint}
+              onChange={(event) => setEndpoint(event.target.value)}
+            >
+              <option value="">Todas</option>
+              {ENDPOINTS.map((item) => (
+                <option key={item} value={item}>
+                  {ENDPOINT_LABELS[item]}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
         {placeOptions.length > 0 ? (
           <label className="field-label">
@@ -329,7 +343,7 @@ export function HistoryScreen() {
             </select>
           </label>
         ) : null}
-        <label className="field-label">
+        <label className={`field-label ${isSimple && placeOptions.length === 0 ? "col-span-2" : ""}`}>
           Categoría
           <select
             className="field"

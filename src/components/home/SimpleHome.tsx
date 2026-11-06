@@ -91,8 +91,7 @@ export function SimpleHome() {
 
   return (
     <>
-      <h1 className="px-1 text-2xl font-semibold">Inicio</h1>
-      <PeriodBar selectable />
+      <PeriodBar title="Inicio" selectable />
 
       <section
         aria-labelledby="hero-label"

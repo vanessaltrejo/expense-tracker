@@ -151,7 +151,6 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
         value={note}
         onChange={(event) => setNote(event.target.value)}
       />
-      <span className="text-xs font-normal">Así se verá en tu historial.</span>
     </label>
   );
 

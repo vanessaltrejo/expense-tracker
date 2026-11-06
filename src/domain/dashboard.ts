@@ -175,7 +175,7 @@ export interface PeriodSummary {
   largest: Movement[];
 }
 
-const LARGEST_COUNT = 3;
+const LARGEST_COUNT = 4;
 
 function isSpending(movement: Movement): boolean {
   return movement.type === "expense" || movement.type === "cardExpense";
