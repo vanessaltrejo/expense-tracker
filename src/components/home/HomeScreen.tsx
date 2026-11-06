@@ -7,6 +7,7 @@ import { formatMoney } from "@/domain/money";
 import { PENDING_CATEGORY } from "@/data/seedData";
 import { moveBanorteToCajita } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
+import { PeriodBar } from "../ui/PeriodBar";
 import { POCKET_STYLES } from "../ui/styles";
 import { IntervalReminderCard } from "./IntervalReminderCard";
 import { MomDebtCard } from "./MomDebtCard";
@@ -91,6 +92,7 @@ export function HomeScreen() {
 
   return (
     <>
+      <PeriodBar />
       <HeroBalance />
       <MomDebtCard />
 

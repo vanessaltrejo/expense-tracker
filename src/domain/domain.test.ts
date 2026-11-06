@@ -4,12 +4,14 @@ import { describe, test } from "node:test";
 import { getCardStatus, getCutForDate, getDueDateForCut } from "./billing.ts";
 import {
   buildDashboard,
-  buildMonthlySummary,
+  buildPeriodSummary,
   estimateYield,
-  getYieldEarnedInMonth,
+  getYieldEarnedBetween,
 } from "./dashboard.ts";
 import { dateInMonth, formatDayHeader, getTodayInMexico } from "./dates.ts";
 import { getHistoryCategories, matchesKind } from "./history.ts";
+import { formatPeriodRange, getPeriodForDate, isInPeriod } from "./periods.ts";
+import { APP_PROFILES, getProfileById } from "./appProfiles.ts";
 import { getInitials } from "./profile.ts";
 import {
   buildPaymentMovements,
@@ -133,6 +135,64 @@ function appData(movements: Movement[], today = "2026-11-03", cajitaRate = 0): A
   };
 }
 
+describe("periods", () => {
+  test("a period runs from one cut to the day before the next and is paid on the 1st", () => {
+    const period = getPeriodForDate("2026-11-06", settings);
+    assert.deepEqual(period, {
+      start: "2026-10-22",
+      end: "2026-11-21",
+      cutDate: "2026-11-22",
+      dueDate: "2026-12-01",
+    });
+    assert.equal(formatPeriodRange(period), "22 oct – 21 nov");
+  });
+
+  test("the cut day already belongs to the next period", () => {
+    assert.equal(getPeriodForDate("2026-11-21", settings).end, "2026-11-21");
+    const next = getPeriodForDate("2026-11-22", settings);
+    assert.equal(next.start, "2026-11-22");
+    assert.equal(next.dueDate, "2027-01-01");
+    assert.equal(isInPeriod("2026-11-22", getPeriodForDate("2026-11-06", settings)), false);
+  });
+
+  test("the summary ranks categories by share and lists the biggest expenses", () => {
+    const movements = [
+      opening("cajita", 1_000),
+      row({ date: "2026-10-23", type: "cardExpense", amount: pesos(600), from: "tarjetaNu", category: "escuela", note: "Viaje" }),
+      row({ date: "2026-10-30", type: "cardExpense", amount: pesos(300), from: "tarjetaNu", category: "salidas", note: "Salida" }),
+      row({ date: "2026-11-01", type: "cardExpense", amount: pesos(100), from: "tarjetaNu", category: "comida", note: "Comida" }),
+      row({ date: "2026-11-02", type: "cardExpense", amount: pesos(50), from: "tarjetaNu", category: "comida", note: "Más comida" }),
+      row({ date: "2026-10-20", type: "cardExpense", amount: pesos(999), from: "tarjetaNu", category: "otros" }),
+      row({ date: "2026-11-03", type: "income", amount: pesos(1_200), to: "banorte", category: "comedor" }),
+    ];
+    const summary = buildPeriodSummary(appData(movements), "2026-11-05");
+
+    assert.equal(summary.totalSpent, pesos(1_050));
+    assert.equal(summary.expenseCount, 4);
+    assert.deepEqual(
+      summary.categories.map((item) => [item.category, item.amount]),
+      [["escuela", pesos(600)], ["salidas", pesos(300)], ["comida", pesos(150)]],
+    );
+    assert.equal(Math.round(summary.categories[0].share * 100), 57);
+    assert.deepEqual(summary.largest.map((item) => item.note), ["Viaje", "Salida", "Comida"]);
+    // The 999 from before the cut belongs to the previous period, and income is kept apart.
+    assert.equal(summary.income, pesos(1_200));
+  });
+});
+
+describe("app profiles", () => {
+  test("three profiles: the owner has the full app, the other two start without data", () => {
+    assert.deepEqual(APP_PROFILES.map((profile) => [profile.id, profile.role]), [
+      ["vanessa", "owner"],
+      ["mama", "viewer"],
+      ["novio", "own"],
+    ]);
+    assert.equal(getProfileById("vanessa")?.initials, "VT");
+    assert.equal(getProfileById("desconocido"), null);
+    assert.equal(getProfileById(null), null);
+  });
+});
+
 describe("profile", () => {
   test("initials are the first letters of the first and last name", () => {
     assert.equal(getInitials("Vanessa Trejo"), "VT");
@@ -194,22 +254,22 @@ describe("balances", () => {
       row({ date: "2026-11-02", type: "expense", amount: pesos(555), from: "mama", category: "otros" }),
     ];
     const dashboard = buildDashboard(appData(movements), "2026-11-03");
-    const summary = buildMonthlySummary(appData(movements), "2026-11-03");
+    const summary = buildPeriodSummary(appData(movements), "2026-11-03");
 
     assert.equal(dashboard.free, pesos(1_000));
-    assert.equal(summary.categories[0].thisMonth, pesos(555));
-    assert.equal(summary.outflowThisMonth, 0);
-    assert.equal(summary.paidByMomThisMonth, pesos(555));
+    assert.equal(summary.categories[0].amount, pesos(555));
+    assert.equal(summary.totalSpent, pesos(555));
+    assert.equal(summary.paidByMom, pesos(555));
   });
 
-  test("older rows count in the summary even if they don't move saldos", () => {
+  test("rows before an opening balance still count in their period's summary", () => {
     const movements = [
       opening("cajita", 1_000),
       opening("tarjetaNu", 0),
-      row({ date: "2026-10-20", type: "cardExpense", amount: pesos(99), from: "tarjetaNu", category: "comida" }),
+      row({ date: "2026-10-25", type: "cardExpense", amount: pesos(99), from: "tarjetaNu", category: "comida" }),
     ];
-    const summary = buildMonthlySummary(appData(movements), "2026-11-03");
-    assert.equal(summary.categories[0].lastMonth, pesos(99));
+    const summary = buildPeriodSummary(appData(movements), "2026-11-03");
+    assert.equal(summary.categories[0].amount, pesos(99));
     assert.equal(buildDashboard(appData(movements), "2026-11-03").debt, 0);
   });
 
@@ -266,8 +326,8 @@ test("card debt and Deuda mami come from movements, with no opening balance", ()
   const dashboard = buildDashboard(appData(movements), "2026-11-05");
   assert.equal(dashboard.debt, pesos(5_156.1));
   assert.equal(dashboard.balances.porCobrarMama, pesos(5_000));
-  // The charges still count in the summary of their own month.
-  assert.equal(buildMonthlySummary(appData(movements), "2026-11-05").categories[0].lastMonth, pesos(5_156.1));
+  // The charges count in the summary of the period they belong to.
+  assert.equal(buildPeriodSummary(appData(movements), "2026-11-05").categories[0].amount, pesos(5_156.1));
 });
 
 test("Deuda mami bookkeeping stays out of the history, real money moves don't", () => {
@@ -493,12 +553,12 @@ describe("yield", () => {
     assert.ok(tomorrow - today <= 200);
   });
 
-  test("interest earned in the month counts the growth plus the user's corrections", () => {
+  test("interest earned in a range counts the growth plus the user's corrections", () => {
     const movements = [
       opening("cajita", 10_000, "2026-11-01"),
       row({ date: "2026-11-15", type: "adjustment", amount: pesos(2), to: "cajita", category: "Rendimiento" }),
     ];
-    const earned = getYieldEarnedInMonth(movements, 0.13, "2026-11", "2026-11-30");
+    const earned = getYieldEarnedBetween(movements, 0.13, "2026-11-01", "2026-11-30", "2026-11-30");
     const growth = getLedgerBalances(movements, "2026-11-30", 0.13).cajita - pesos(10_000) - pesos(2);
     assert.equal(earned, growth + pesos(2));
     assert.ok(earned > pesos(100));

@@ -11,14 +11,6 @@ import type {
 export const OPENING_BALANCE_CATEGORY = "Saldo inicial";
 export const YIELD_CATEGORY = "Rendimiento";
 
-export const POCKET_IDS: PocketId[] = [
-  "cajita",
-  "banorte",
-  "efectivo",
-  "porCobrarMama",
-  "tarjetaNu",
-];
-
 export const ENDPOINT_LABELS: Record<MovementEndpoint, string> = {
   cajita: "Cajita Turbo",
   banorte: "Banorte",

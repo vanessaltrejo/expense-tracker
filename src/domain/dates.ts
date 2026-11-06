@@ -64,22 +64,6 @@ export function shiftMonth(
   return { year: Math.floor(zeroBased / 12), month: (zeroBased % 12) + 1 };
 }
 
-/** Month identifier such as "2026-11". */
-export function monthKey(date: IsoDate): string {
-  return date.slice(0, 7);
-}
-
-export function previousMonthKey(date: IsoDate): string {
-  const { year, month } = getYearMonth(date);
-  const previous = shiftMonth(year, month, -1);
-  return `${previous.year}-${pad(previous.month)}`;
-}
-
-export function endOfMonth(date: IsoDate): IsoDate {
-  const { year, month } = getYearMonth(date);
-  return dateInMonth(year, month, 31);
-}
-
 export function formatShortDate(date: IsoDate): string {
   return new Intl.DateTimeFormat("es-MX", {
     day: "numeric",
@@ -111,13 +95,6 @@ export function formatLongDate(date: IsoDate): string {
     month: "long",
     timeZone: "UTC",
   }).format(toUtcMs(date));
-}
-
-export function formatMonthName(key: string): string {
-  return new Intl.DateTimeFormat("es-MX", {
-    month: "long",
-    timeZone: "UTC",
-  }).format(toUtcMs(`${key}-01`));
 }
 
 /** Wording for an upcoming charge: "Hoy", "Mañana", "En 3 días", "Hace 2 días". */

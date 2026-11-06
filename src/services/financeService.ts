@@ -2,7 +2,6 @@ import {
   buildPaymentMovements,
   buildYieldAdjustment,
   getLedgerBalances,
-  OPENING_BALANCE_CATEGORY,
   type PaymentInput,
 } from "@/domain/ledger";
 import { generateExpectedCharges } from "@/domain/recurring";
@@ -17,7 +16,6 @@ import type {
   MovementDraft,
   MovementEndpoint,
   PaymentPlan,
-  PocketId,
   Shortcut,
 } from "@/domain/types";
 import { getFinanceRepository } from "./financeRepository";
@@ -152,31 +150,6 @@ export async function logShortcutWithPrice(
   const priced = { ...shortcut, amount };
   await repository.current.saveShortcut(priced);
   return logShortcut(priced, fixedExpenses, today);
-}
-
-/** Only the money the user holds needs an opening balance: card debt and Deuda mami come from movements. */
-export type OpeningPocket = Extract<PocketId, "cajita" | "banorte" | "efectivo">;
-
-const SETUP_POCKETS: OpeningPocket[] = ["cajita", "banorte", "efectivo"];
-
-/** Every pocket gets an opening row, even at 0, so the pocket has a clear starting date. */
-export async function setupOpeningBalances(
-  balances: Record<OpeningPocket, Cents>,
-  today: IsoDate,
-): Promise<void> {
-  const drafts: MovementDraft[] = SETUP_POCKETS.map((pocket) => ({
-    date: today,
-    type: "adjustment",
-    amount: balances[pocket],
-    from: null,
-    to: pocket,
-    category: OPENING_BALANCE_CATEGORY,
-    note: "Saldo inicial",
-    dataKind: "real",
-  }));
-  await repository.current.addMovements(drafts);
-  // Asks the browser not to clear this data when the phone runs low on space.
-  await navigator.storage?.persist?.();
 }
 
 /** Records an interval expense on its real date and restarts its reminder. */

@@ -2,12 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import {
-  formatDayHeader,
-  formatMonthName,
-  monthKey,
-  previousMonthKey,
-} from "@/domain/dates";
+import { formatDayHeader } from "@/domain/dates";
 import {
   getHistoryCategories,
   type HistoryKind,
@@ -15,6 +10,7 @@ import {
 } from "@/domain/history";
 import { ENDPOINT_LABELS, getOpeningDates, isMomDebtEntry } from "@/domain/ledger";
 import { formatMoney } from "@/domain/money";
+import { isInPeriod } from "@/domain/periods";
 import type {
   Movement,
   MovementEndpoint,
@@ -25,6 +21,7 @@ import { changeMovementCategory, deleteMovement } from "@/services/financeServic
 import { PENDING_CATEGORY } from "@/data/seedData";
 import { useFinance } from "../FinanceProvider";
 import { SHEET_URL } from "../sync/sheetUrl";
+import { PeriodBar } from "../ui/PeriodBar";
 import { formatCategory, getCategoryIcon, TYPE_STYLES } from "../ui/styles";
 
 /** Only the pockets that hold or owe money. Deuda mami has its own card on Home. */
@@ -167,13 +164,12 @@ function MovementRow({
 }
 
 export function HistoryScreen() {
-  const { data, today } = useFinance();
+  const { data, dashboard } = useFinance();
+  const { period } = dashboard;
   const [endpoint, setEndpoint] = useState("");
   const [category, setCategory] = useState("");
   const [kind, setKind] = useState<HistoryKind>("all");
 
-  const thisMonth = monthKey(today);
-  const lastMonth = previousMonthKey(today);
   const openings = useMemo(() => getOpeningDates(data.movements), [data.movements]);
 
   const visible = useMemo(
@@ -181,15 +177,14 @@ export function HistoryScreen() {
       data.movements.filter((movement) => {
         // The Deuda mami entries only feed the calculations: the purchase itself is listed.
         if (isMomDebtEntry(movement)) return false;
-        const key = monthKey(movement.date);
-        if (key !== thisMonth && key !== lastMonth) return false;
+        if (!isInPeriod(movement.date, period)) return false;
         if (!matchesKind(movement, kind)) return false;
         if (endpoint && movement.from !== endpoint && movement.to !== endpoint) {
           return false;
         }
         return !category || movement.category === category;
       }),
-    [data.movements, thisMonth, lastMonth, endpoint, category, kind],
+    [data.movements, period, endpoint, category, kind],
   );
 
   const categories = useMemo(() => getHistoryCategories(data.movements), [data.movements]);
@@ -203,16 +198,18 @@ export function HistoryScreen() {
         ? categories.expenses
         : [...new Set([...categories.expenses, ...categories.income])];
 
-  const months = [thisMonth, lastMonth].map((key) => ({
-    key,
-    movements: visible
-      .filter((movement) => monthKey(movement.date) === key)
-      .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)),
-  })).map(({ key, movements }) => ({ key, days: groupByDay(movements) }));
+  const days = useMemo(
+    () =>
+      groupByDay(
+        [...visible].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)),
+      ),
+    [visible],
+  );
 
   return (
     <>
       <h1 className="px-1 text-2xl font-semibold">Historial</h1>
+      <PeriodBar />
 
       <div role="radiogroup" aria-label="Qué mostrar" className="grid grid-cols-3 gap-2">
         {KIND_OPTIONS.map((option) => (
@@ -289,31 +286,30 @@ export function HistoryScreen() {
         <p className="card text-ink-soft">Nada con estos filtros.</p>
       ) : null}
 
-      {months.map(({ key, days }) =>
-        days.length > 0 ? (
-          <section key={key} className="card gap-0 pb-1">
-            <h2 className="pb-1 text-base font-semibold first-letter:uppercase">
-              {formatMonthName(key)}
-            </h2>
-            {days.map((day) => (
-              <div key={day.date}>
-                <h3 className="mt-3 border-b border-line pb-1.5 text-sm font-medium text-ink-soft">
-                  {formatDayHeader(day.date)}
-                </h3>
-                <ul>
-                  {day.movements.map((movement) => (
-                    <MovementRow
-                      key={movement.id}
-                      movement={movement}
-                      summaryOnly={isBeforeOpening(movement, openings)}
-                    />
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </section>
-        ) : null,
-      )}
+      {days.length > 0 ? (
+        <section className="card gap-0 pb-1">
+          {days.map((day, index) => (
+            <div key={day.date}>
+              <h3
+                className={`border-b border-line pb-1.5 text-sm font-medium text-ink-soft ${
+                  index === 0 ? "" : "mt-3"
+                }`}
+              >
+                {formatDayHeader(day.date)}
+              </h3>
+              <ul>
+                {day.movements.map((movement) => (
+                  <MovementRow
+                    key={movement.id}
+                    movement={movement}
+                    summaryOnly={isBeforeOpening(movement, openings)}
+                  />
+                ))}
+              </ul>
+            </div>
+          ))}
+        </section>
+      ) : null}
 
       <a href={SHEET_URL} target="_blank" rel="noreferrer" className="btn-secondary min-h-12">
         Ver todo en Google Sheets

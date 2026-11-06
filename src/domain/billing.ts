@@ -133,32 +133,3 @@ export function getCardStatus(
     isFullyPaid: false,
   };
 }
-
-/** Most recent closed cuts, using recorded statements and computing any missing ones. */
-export function getRecentStatements(
-  movements: Movement[],
-  records: StatementRecord[],
-  days: BillingDays,
-  today: IsoDate,
-  count: number,
-): StatementRecord[] {
-  const statements: StatementRecord[] = [];
-  let cut = getLastClosedCut(today, days);
-
-  // Bounded so that a sheet with no history can't loop forever.
-  for (let index = 0; index < 24 && statements.length < count; index += 1) {
-    const amount = getDebtAtCut(movements, cut, records);
-    if (amount !== null) {
-      statements.push({
-        cutDate: cut,
-        dueDate: getDueDateForCut(cut, days),
-        statementAmount: amount,
-      });
-    }
-    const { year, month } = getYearMonth(cut);
-    const previous = shiftMonth(year, month, -1);
-    cut = dateInMonth(previous.year, previous.month, days.cutDay);
-  }
-
-  return statements;
-}

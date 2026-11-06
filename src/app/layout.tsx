@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 
-import { AppShell } from "@/components/AppShell";
-import { FinanceProvider } from "@/components/FinanceProvider";
+import { ProfileGate } from "@/components/profile/ProfileGate";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -31,9 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="es-MX" className={`${geistSans.variable} antialiased`}>
       <body>
-        <FinanceProvider>
-          <AppShell>{children}</AppShell>
-        </FinanceProvider>
+        <ProfileGate>{children}</ProfileGate>
       </body>
     </html>
   );

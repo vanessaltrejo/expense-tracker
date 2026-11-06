@@ -86,7 +86,3 @@ export function syncWithSheet(): Promise<SyncState> {
   });
   return inFlight;
 }
-
-export async function countPendingChanges(): Promise<number> {
-  return (await getFinanceRepository().pendingOps()).length;
-}

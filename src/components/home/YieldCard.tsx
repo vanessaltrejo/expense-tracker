@@ -9,7 +9,7 @@ export function YieldCard() {
   const { data, dashboard, today, runAction } = useFinance();
   const { plan, card, balances } = dashboard;
 
-  if (balances.cajita <= 0 && dashboard.yieldThisMonth === 0) return null;
+  if (balances.cajita <= 0 && dashboard.yieldThisPeriod === 0) return null;
 
   return (
     <section className="card">
@@ -41,11 +41,11 @@ export function YieldCard() {
         />
       </label>
 
-      {dashboard.yieldThisMonth !== 0 ? (
+      {dashboard.yieldThisPeriod !== 0 ? (
         <p className="amount text-sm">
-          <span className="text-ink-soft">Ganado este mes: </span>
+          <span className="text-ink-soft">Ganado en este periodo: </span>
           <span className="font-semibold">
-            {formatMoney(dashboard.yieldThisMonth)}
+            {formatMoney(dashboard.yieldThisPeriod)}
           </span>
         </p>
       ) : null}

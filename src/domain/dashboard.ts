@@ -1,17 +1,7 @@
-import {
-  type CardStatus,
-  getCardStatus,
-  getCutForDate,
-  getRecentStatements,
-} from "./billing.ts";
-import {
-  addDays,
-  daysBetween,
-  endOfMonth,
-  monthKey,
-  previousMonthKey,
-} from "./dates.ts";
+import { type CardStatus, getCardStatus, getCutForDate } from "./billing.ts";
+import { addDays, daysBetween } from "./dates.ts";
 import { dailyGrowth, getLedgerBalances, YIELD_CATEGORY } from "./ledger.ts";
+import { getPeriodForDate, isInPeriod, type Period } from "./periods.ts";
 import { getIntervalReminders, type IntervalReminder } from "./recurring.ts";
 import type {
   AppData,
@@ -21,7 +11,6 @@ import type {
   Movement,
   PaymentPlan,
   PocketId,
-  StatementRecord,
 } from "./types.ts";
 
 /** Interest the balance will earn in `days` days, compounded daily. */
@@ -35,35 +24,36 @@ export function estimateYield(
 }
 
 /**
- * Interest earned inside a month: what the cajita grew on its own, plus the corrections
- * the user made when comparing with Nu. `asOf` cuts the current month at today.
+ * Interest earned between two dates: what the cajita grew on its own, plus the corrections
+ * the user made when comparing with Nu. The range is cut at `asOf`, so today ends it early.
  */
-export function getYieldEarnedInMonth(
+export function getYieldEarnedBetween(
   movements: Movement[],
   annualRate: number,
-  key: string,
+  start: IsoDate,
+  end: IsoDate,
   asOf: IsoDate,
 ): Cents {
-  const monthStart = `${key}-01`;
-  const end = endOfMonth(monthStart) < asOf ? endOfMonth(monthStart) : asOf;
-  const before = addDays(monthStart, -1);
+  const last = end < asOf ? end : asOf;
+  if (last < start) return 0;
 
   const interestUntil = (date: IsoDate): number =>
     getLedgerBalances(movements, date, annualRate).cajita -
     getLedgerBalances(movements, date).cajita;
 
-  const grown = end < monthStart ? 0 : interestUntil(end) - interestUntil(before);
-  return grown + getYieldForMonth(movements, key);
+  const grown = interestUntil(last) - interestUntil(addDays(start, -1));
+  return grown + getYieldCorrections(movements, start, last);
 }
 
-export function getYieldForMonth(movements: Movement[], key: string): Cents {
+function getYieldCorrections(movements: Movement[], start: IsoDate, end: IsoDate): Cents {
   return movements
     .filter(
       (movement) =>
         movement.dataKind === "real" &&
         movement.type === "adjustment" &&
         movement.category === YIELD_CATEGORY &&
-        monthKey(movement.date) === key,
+        movement.date >= start &&
+        movement.date <= end,
     )
     .reduce(
       (total, movement) =>
@@ -86,6 +76,8 @@ export interface PlanView {
 
 export interface Dashboard {
   today: IsoDate;
+  /** The card period that contains today. */
+  period: Period;
   balances: Record<PocketId, Cents>;
   realMoney: Cents;
   debt: Cents;
@@ -103,7 +95,7 @@ export interface Dashboard {
   plan: PlanView;
   estimatedYield: Cents;
   cajitaOnPaymentDay: Cents;
-  yieldThisMonth: Cents;
+  yieldThisPeriod: Cents;
   intervalReminders: IntervalReminder[];
 }
 
@@ -130,6 +122,7 @@ function buildPlanView(
 
 export function buildDashboard(data: AppData, today: IsoDate): Dashboard {
   const { movements, settings, statements, expectedCharges } = data;
+  const period = getPeriodForDate(today, settings);
   const balances = getLedgerBalances(movements, today, settings.annualYieldRate);
 
   const realMoney = balances.cajita + balances.banorte + balances.efectivo;
@@ -178,6 +171,7 @@ export function buildDashboard(data: AppData, today: IsoDate): Dashboard {
 
   return {
     today,
+    period,
     balances,
     realMoney,
     debt,
@@ -191,121 +185,80 @@ export function buildDashboard(data: AppData, today: IsoDate): Dashboard {
     plan,
     estimatedYield,
     cajitaOnPaymentDay: balances.cajita + estimatedYield,
-    yieldThisMonth: getYieldEarnedInMonth(
+    yieldThisPeriod: getYieldEarnedBetween(
       movements,
       settings.annualYieldRate,
-      monthKey(today),
+      period.start,
+      period.end,
       today,
     ),
     intervalReminders: getIntervalReminders(data.fixedExpenses, today),
   };
 }
 
-export interface CategoryComparison {
+export interface CategoryShare {
   category: string;
-  thisMonth: Cents;
-  lastMonth: Cents;
+  amount: Cents;
+  /** Fraction of everything spent in the period, from 0 to 1. */
+  share: number;
 }
 
-export interface MonthlySummary {
-  thisMonthKey: string;
-  lastMonthKey: string;
-  categories: CategoryComparison[];
-  incomeThisMonth: Cents;
-  incomeLastMonth: Cents;
-  outflowThisMonth: Cents;
-  outflowLastMonth: Cents;
-  yieldThisMonth: Cents;
-  yieldLastMonth: Cents;
-  paidByMomThisMonth: Cents;
-  recentStatements: StatementRecord[];
-  cardLimit: Cents;
+export interface PeriodSummary {
+  period: Period;
+  /** Everything the period cost, including what mom paid. */
+  totalSpent: Cents;
+  paidByMom: Cents;
+  income: Cents;
+  expenseCount: number;
+  categories: CategoryShare[];
+  /** The biggest single expenses, largest first. */
+  largest: Movement[];
 }
+
+const LARGEST_COUNT = 3;
 
 function isSpending(movement: Movement): boolean {
   return movement.type === "expense" || movement.type === "cardExpense";
 }
 
-export function buildMonthlySummary(
-  data: AppData,
-  today: IsoDate,
-): MonthlySummary {
-  const thisMonthKey = monthKey(today);
-  const lastMonthKey = previousMonthKey(today);
-  // Rows older than an opening balance still count here: only saldos ignore them.
-  const realMovements = data.movements.filter(
-    (movement) => movement.dataKind !== "dummy" && movement.date <= today,
+export function buildPeriodSummary(data: AppData, today: IsoDate): PeriodSummary {
+  const period = getPeriodForDate(today, data.settings);
+  // Rows older than an opening balance still count here: only balances ignore them.
+  const inPeriod = data.movements.filter(
+    (movement) =>
+      movement.dataKind !== "dummy" &&
+      movement.date <= today &&
+      isInPeriod(movement.date, period),
   );
 
-  const byCategory = new Map<string, CategoryComparison>();
-  let incomeThisMonth = 0;
-  let incomeLastMonth = 0;
-  let outflowThisMonth = 0;
-  let outflowLastMonth = 0;
-  let paidByMomThisMonth = 0;
+  const spending = inPeriod.filter(isSpending);
+  const byCategory = new Map<string, Cents>();
+  let totalSpent = 0;
+  let paidByMom = 0;
 
-  for (const movement of realMovements) {
-    const key = monthKey(movement.date);
-    const isThisMonth = key === thisMonthKey;
-    if (!isThisMonth && key !== lastMonthKey) continue;
-
-    if (movement.type === "income") {
-      if (isThisMonth) incomeThisMonth += movement.amount;
-      else incomeLastMonth += movement.amount;
-    }
-
-    if (!isSpending(movement)) continue;
-
+  for (const movement of spending) {
     const category = movement.category ?? "otros";
-    const row = byCategory.get(category) ?? {
-      category,
-      thisMonth: 0,
-      lastMonth: 0,
-    };
-    if (isThisMonth) row.thisMonth += movement.amount;
-    else row.lastMonth += movement.amount;
-    byCategory.set(category, row);
-
-    if (movement.from === "mama") {
-      // Counts toward what the category cost, but it never left the user's money.
-      if (isThisMonth) paidByMomThisMonth += movement.amount;
-    } else if (isThisMonth) {
-      outflowThisMonth += movement.amount;
-    } else {
-      outflowLastMonth += movement.amount;
-    }
+    byCategory.set(category, (byCategory.get(category) ?? 0) + movement.amount);
+    totalSpent += movement.amount;
+    // It counts toward what the category cost, but it never left the user's money.
+    if (movement.from === "mama") paidByMom += movement.amount;
   }
 
   return {
-    thisMonthKey,
-    lastMonthKey,
-    categories: [...byCategory.values()].sort(
-      (a, b) => b.thisMonth - a.thisMonth || b.lastMonth - a.lastMonth,
-    ),
-    incomeThisMonth,
-    incomeLastMonth,
-    outflowThisMonth,
-    outflowLastMonth,
-    yieldThisMonth: getYieldEarnedInMonth(
-      realMovements,
-      data.settings.annualYieldRate,
-      thisMonthKey,
-      today,
-    ),
-    yieldLastMonth: getYieldEarnedInMonth(
-      realMovements,
-      data.settings.annualYieldRate,
-      lastMonthKey,
-      today,
-    ),
-    paidByMomThisMonth,
-    recentStatements: getRecentStatements(
-      data.movements,
-      data.statements,
-      data.settings,
-      today,
-      2,
-    ),
-    cardLimit: data.settings.cardLimit,
+    period,
+    totalSpent,
+    paidByMom,
+    income: inPeriod
+      .filter((movement) => movement.type === "income")
+      .reduce((total, movement) => total + movement.amount, 0),
+    expenseCount: spending.length,
+    categories: [...byCategory.entries()]
+      .map(([category, amount]) => ({
+        category,
+        amount,
+        share: totalSpent > 0 ? amount / totalSpent : 0,
+      }))
+      .sort((a, b) => b.amount - a.amount),
+    largest: [...spending].sort((a, b) => b.amount - a.amount).slice(0, LARGEST_COUNT),
   };
 }

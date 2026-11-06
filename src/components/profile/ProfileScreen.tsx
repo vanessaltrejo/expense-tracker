@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 
+import { setActiveProfileId } from "@/services/activeProfile";
 import { useFinance } from "../FinanceProvider";
 import { SyncCard } from "../sync/SyncCard";
 import { Avatar } from "./Avatar";
@@ -52,6 +53,14 @@ export function ProfileScreen() {
           </span>
         </Link>
       </section>
+
+      <button
+        type="button"
+        className="btn-secondary min-h-12"
+        onClick={() => setActiveProfileId(null)}
+      >
+        Cambiar de perfil
+      </button>
 
       {isConnected ? (
         <button
