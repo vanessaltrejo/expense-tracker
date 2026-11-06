@@ -1,20 +1,47 @@
 # Pockets: cómo funciona la app y por qué está hecha así
 
-**Para quién es este documento:** para alguien que nunca ha visto la app. Explica qué problema resuelve, cómo piensa el dinero, cómo se calcula cada número, cómo se guardan los datos y, sobre todo, **por qué se tomó cada decisión**.
+**Para quién es este documento:** para alguien que nunca ha visto la app. Explica qué problema resuelve, cómo piensa el dinero, qué hace cada pantalla, cómo se calcula cada número, cómo se guardan los datos, cómo entra cada persona y, sobre todo, **por qué se tomó cada decisión**.
 
-**Cómo se relaciona con la propuesta original:** la propuesta (`Propuesta app de gastos personal.md`) se escribió cuando todavía no había app. Muchas cosas cambiaron al usarla con datos reales. Este documento describe la app **actual**; la sección 18 lista qué cambió respecto a la propuesta y por qué.
+**Cómo se relaciona con la propuesta original:** la propuesta (`Propuesta app de gastos personal.md`) se escribió cuando todavía no había app. Muchas cosas cambiaron al usarla con datos reales. Este documento describe la app **actual**; la sección 20 lista qué cambió respecto a la propuesta y por qué.
+
+**Índice**
+
+1. El problema y la idea
+2. Vocabulario
+3. Quién usa la app (resumen)
+4. Entrar: usuario y contraseña
+5. La versión de Vanessa: las cinco bolsas
+6. Inicio de Vanessa: los números
+7. Periodos de tarjeta (del 22 al 21)
+8. Movimientos y los cuatro botones
+9. Deuda mami
+10. Cómo se calculan los saldos
+11. Rendimiento de la cajita
+12. Cobros esperados (suscripciones)
+13. Atajos
+14. Historial, Resumen y Perfil
+15. La versión de Francisco (simple, por mes)
+16. Google Sheets como base de datos
+17. Cómo se sincroniza
+18. Seguridad y permisos
+19. Cómo está construido y cómo operarlo
+20. Qué cambió respecto a la propuesta
+21. Lo que falta o se puede mejorar
+22. Las decisiones clave
 
 ---
 
-## 1. El problema y la idea en una frase
+## 1. El problema y la idea
 
 Vanessa tiene su dinero repartido en varios lugares y casi todos sus gastos van a una tarjeta de crédito. Llevaba las cuentas en la cabeza, así que cualquier gasto chico le desacomodaba el plan.
 
 **Pockets responde una pregunta: ¿cuánto debo en la tarjeta y cuánto me falta por juntar para pagarla?**
 
-La idea que lo sostiene todo: **cada lugar donde hay dinero es una "bolsa"**, y la tarjeta es una **deuda**, no dinero. Con eso la app calcula, sin que nadie tenga que sumar a mano, cuánto se debe, cuánto hay y cuánto falta.
+La idea que lo sostiene todo: **cada lugar donde hay dinero es una "bolsa"**, y la tarjeta es una **deuda**, no dinero. Con eso la app calcula, sin que nadie sume a mano, cuánto se debe, cuánto hay y cuánto falta.
 
-Pockets es una **PWA** (una página web que se instala en el teléfono y se comporta como app), y usa **Google Sheets como base de datos**: uno por persona, todos en la cuenta de la dueña, que puede abrirlos y ver o corregir todo.
+Después se sumó una segunda necesidad: su novio, Francisco, quería ver **en qué gasta** su dinero, con una sola cuenta de banco y algo de efectivo. La misma app se adapta a los dos con dos "layouts" (versiones de pantalla): el completo y el simple.
+
+Pockets es una **PWA**: una página web que se instala en el teléfono y se comporta como app. Usa **Google Sheets como base de datos**: uno por persona, todos guardados en la cuenta de Google de Vanessa, que puede abrirlos y ver o corregir todo.
 
 ---
 
@@ -22,20 +49,49 @@ Pockets es una **PWA** (una página web que se instala en el teléfono y se comp
 
 | Palabra | Qué significa |
 | --- | --- |
-| **Bolsa** | Un lugar donde hay dinero (o deuda): Cajita Nu Débito, Banorte, Efectivo, Deuda mami y Tarjeta Nu crédito. |
+| **Bolsa** | Un lugar donde hay dinero (o deuda). |
 | **Movimiento** | Cualquier cosa que pasa con el dinero. Es la única "verdad" que se guarda. |
 | **Libro (ledger)** | Cada bolsa es un libro: dinero que entró menos dinero que salió. Los saldos **nunca se guardan**, siempre se calculan. |
 | **Saldo inicial** | El saldo con el que empieza una bolsa en una fecha. Lo anterior a esa fecha ya no mueve el saldo. |
-| **Corte** | El día 22: Nu cierra el estado de cuenta. |
+| **Corte** | El día 22: Nu cierra el estado de cuenta de la tarjeta. |
 | **Fecha límite** | El día 1: último día para pagar lo del corte anterior. |
-| **Periodo** | Del 22 de un mes al 21 del siguiente. Se paga el día 1. La app lee todo en periodos. |
+| **Periodo** | Del 22 de un mes al 21 del siguiente. Se paga el día 1. La versión de Vanessa lee todo en periodos. |
 | **Deuda mami** | Lo que la mamá de Vanessa le debe. Es un registro de seguimiento, no dinero real. |
+| **Layout** | La versión de pantallas que ve una persona: **completo** (Vanessa y Mami) o **simple** (Francisco). |
+| **Rol** | Qué puede hacer: **dueño** (todo) o **solo lectura** (solo mirar). |
 | **Dummy** | Dato de relleno marcado visiblemente. No cuenta en saldos ni en el Resumen. |
 | **Sheet gana** | Si algo cambia a la vez en la app y en el Sheets, se queda lo del Sheets. |
+| **Cuenta de servicio** | Un "robot" de Google que la app usa para leer y escribir los Sheets compartidos con él. |
 
 ---
 
-## 3. Las cinco bolsas
+## 3. Quién usa la app (resumen)
+
+| Usuario | Nombre que se ve | Layout | Rol | Su Sheets |
+| --- | --- | --- | --- | --- |
+| `vanessa` | Vanessa Trejo | Completo | Todo | "Gastos Vanessa" |
+| `mami` | Mami | Completo | **Solo lectura** | El de Vanessa |
+| `francisco` | Francisco Amaya | Simple | Todo | "Gastos Francisco" |
+
+Cada persona usa la app **en su propio teléfono**. Los tres Sheets viven en la cuenta de Google de Vanessa. El Sheets de Francisco se comparte además con su correo, para que él también pueda abrirlo.
+
+---
+
+## 4. Entrar: usuario y contraseña
+
+Al abrir la app, si nadie ha entrado, aparece **"Entra a Pockets"** con dos campos: usuario y contraseña. El usuario no distingue mayúsculas ni espacios ("Mami" y " mami " entran igual).
+
+- Con datos correctos, se abre la app con el layout y los permisos de esa persona.
+- Con datos incorrectos dice "El usuario o la contraseña no coinciden", y no revela cuál de los dos falló.
+- **Cerrar sesión** está en Perfil. Al cerrar, la app borra lo que tenía en memoria de esa persona y vuelve a la pantalla de entrada.
+- Las páginas de **Aviso de privacidad** y **Términos de uso** se pueden leer sin entrar.
+- Si el Sheets de alguien todavía no está conectado, la app dice **"Tu espacio todavía no está listo"**, y Perfil sigue abierto para sincronizar o cerrar sesión.
+
+> **Por qué usuario y contraseña y no Google:** así Mami y Francisco no necesitan una cuenta de Google, y todos los datos quedan en la cuenta de Vanessa. Reemplazó al selector de perfiles anterior ("¿Quién está usando Pockets?"), que servía para elegir un espacio pero no era un candado.
+
+---
+
+## 5. La versión de Vanessa: las cinco bolsas
 
 | Bolsa | Qué es | Por qué existe |
 | --- | --- | --- |
@@ -43,38 +99,38 @@ Pockets es una **PWA** (una página web que se instala en el teléfono y se comp
 | **Banorte** | Cuenta de paso. | Todo lo que llega cae primero aquí (horno³, comedor, mamá) y de aquí se pasa a la cajita. |
 | **Efectivo** | Dinero en mano. | Casi no se usa, pero existe: a veces la mamá toma efectivo o lo devuelve así. |
 | **Deuda mami** | Lo que la mamá debe. | Es seguimiento, **no dinero real** hasta que lo regresa. |
-| **Tarjeta Nu crédito** | La deuda de la tarjeta, límite de 40,000. | Es **deuda**: sube con cada compra y baja con cada pago. |
+| **Tarjeta Nu crédito** | La deuda de la tarjeta, con límite de 40,000. | Es **deuda**: sube con cada compra y baja con cada pago. |
 
-Dinero real = cajita + Banorte + efectivo. **Deuda mami no se suma como dinero real** porque todavía no está en manos de Vanessa.
+**Dinero real = cajita + Banorte + efectivo.** Deuda mami no se suma como dinero real porque todavía no está en manos de Vanessa.
 
-> **Por qué se cambió el nombre de la cajita:** en la propuesta se llamaba "Cajita Turbo". En la práctica es la cajita de débito de Nu, y el nombre nuevo (Cajita Nu Débito) evita confundirla con la tarjeta (Tarjeta Nu crédito).
+> **Por qué la cajita se llama "Cajita Nu Débito":** en la propuesta era "Cajita Turbo". En la práctica es la cajita de débito de Nu, y el nombre nuevo evita confundirla con la tarjeta (Tarjeta Nu crédito).
 
 ---
 
-## 4. Los números de la pantalla Inicio
+## 6. Inicio de Vanessa: los números
 
 El número más grande es lo que **debe** en la tarjeta, no lo que le sobra. Eso se decidió al usar la app: lo que de verdad le importa es cuánta deuda tiene y si ya puede pagarla.
 
-La tarjeta azul de arriba muestra:
+Arriba, la tarjeta azul muestra:
 
-1. **Debes en la tarjeta** (número grande): todo lo que ha salido de la tarjeta menos lo que ya se pagó.
-2. **Te falta juntar:** lo que debe menos su dinero real. Si ya tiene suficiente, es 0. La deuda mami **no** ayuda a pagar la tarjeta porque aún no regresa.
+1. **Debes en la tarjeta** (número grande): lo que ha salido de la tarjeta menos lo que ya se pagó.
+2. **Te falta juntar:** lo que debe menos su dinero real. Si ya tiene suficiente, es 0. Deuda mami **no** ayuda a pagar la tarjeta, porque aún no regresa.
 3. **Balance total:** dinero real **más** Deuda mami, menos la deuda de la tarjeta. Es el panorama completo "contando lo que me deben". Puede ser negativo.
 4. **Con tus suscripciones, el 1 pagas:** aparece solo si hay cobros esperados antes del corte. Suma la deuda actual más esos cobros y dice cuánto faltaría juntar.
 
 > **Por qué tres números y no uno:** cada uno responde una duda distinta. "¿Cuánto debo?", "¿cuánto me falta para pagar?" y "¿cómo estoy si cuento lo que me deben?" no son la misma cuenta, y mezclarlas era justo lo confuso de llevarlo en la cabeza.
 
-Más abajo, en orden: la tarjeta de **Deuda mami**, los botones rápidos (Agregar gasto, Pagar tarjeta, Mover dinero), los gastos "por revisar", lo que falta pasar de Banorte a la cajita, los próximos cobros, el rendimiento de la cajita y, al final, **Bolsas y crédito** (saldos de cada bolsa y cuánto del límite se usa). Lo que está en 0 no se muestra.
+Más abajo, en orden: la tarjeta de **Deuda mami**, los botones rápidos (Agregar gasto, Pagar tarjeta, Mover dinero), los gastos "por revisar", lo que falta pasar de Banorte a la cajita, los **Próximos cobros**, el **rendimiento** de la cajita y, al final, **Bolsas y crédito** (saldo de cada bolsa y cuánto del límite se usa). Lo que está en 0 no se muestra.
 
 ---
 
-## 5. Los periodos de tarjeta (el 22 al 21)
+## 7. Periodos de tarjeta (del 22 al 21)
 
 Nu cierra su estado de cuenta el día 22 y se paga el día 1. Entonces:
 
 - Un **periodo** va del 22 de un mes al 21 del siguiente, y se paga el día 1.
-- **Regla del día de corte:** una compra hecha **el mismo día 22** ya pertenece al **siguiente** periodo, igual que en Nu.
-- La app usa estos periodos en Inicio, Historial y Resumen, **no meses de calendario**. Así lo que ve en la app coincide con lo que ve en Nu.
+- **Regla del día de corte:** una compra hecha **el mismo día 22** pertenece al **siguiente** periodo, igual que en Nu.
+- La versión de Vanessa usa estos periodos en Inicio, Historial y Resumen, **no meses de calendario**. Así lo que ve en la app coincide con lo que ve en Nu.
 
 Qué entra al pago del día 1: lo comprado hasta el día 21 y los cobros esperados que caen antes del corte. Lo demás pasa al siguiente periodo. (Hoy solo se ve el periodo actual; los anteriores se podrán ver cuando tengan su información completa.)
 
@@ -82,7 +138,7 @@ El estado de cuenta de cada corte viene de la pestaña **Cortes** del Sheets. Si
 
 ---
 
-## 6. Los movimientos y los cuatro botones
+## 8. Movimientos y los cuatro botones
 
 Todo lo que pasa es un **movimiento** de uno de estos tipos:
 
@@ -91,10 +147,12 @@ Todo lo que pasa es un **movimiento** de uno de estos tipos:
 | **Ingreso** | Suma a una bolsa | Cae horno³ en Banorte |
 | **Gasto** | Resta de una bolsa y guarda categoría | Estacionamiento pagado en efectivo |
 | **Gasto con tarjeta** | Sube la deuda de la tarjeta y guarda categoría | Chilaquiles, una salida con amigos |
-| **Transferencia** | Mueve dinero entre bolsas; **no es un gasto** | De Banorte a la cajita; pagar la tarjeta |
+| **Transferencia** | Mueve dinero entre bolsas, o lo manda a otra persona; **no es un gasto** | De Banorte a la cajita; pagar la tarjeta |
 | **Ajuste** | Corrige o inicia un saldo | El **Saldo inicial** de una bolsa |
 
-En la app se crean con cuatro pestañas dentro de **Agregar**:
+Cada movimiento guarda: un **ID**, la **fecha**, el **tipo**, el **monto** (en centavos), de qué bolsa **sale** ("De"), a cuál **entra** ("A"), la **categoría**, una **nota** y si es dato **Real** o **Dummy**.
+
+En la versión de Vanessa se crean con cuatro pestañas dentro de **Agregar**:
 
 - **Gasto:** monto, "¿en qué fue?", "¿con qué se pagó?" (viene con la tarjeta ya elegida, porque casi todo va ahí), categoría, fecha y la opción de guardarlo como frecuente. Arriba hay **atajos** para lo que se repite.
 - **Ingreso:** monto, a dónde cayó (Banorte o efectivo) y categoría.
@@ -103,13 +161,13 @@ En la app se crean con cuatro pestañas dentro de **Agregar**:
 
 > **Por qué "Pagar tarjeta" pide solo el monto:** se usa una o dos veces al mes y siempre sale de la cajita. Pedir "de dónde" era un paso que nunca cambiaba. Por dentro es una transferencia de la cajita a la tarjeta con la nota "Pago de tarjeta". Se puede pagar en varias partes: cada parte es un pago.
 
-> **Por qué Mover no tiene la tarjeta ni Deuda mami:** cada una ya tiene su flujo propio (Pagar tarjeta y la tarjeta de Deuda mami). Tenerlas en dos lugares confundía.
+> **Por qué Mover no incluye la tarjeta ni Deuda mami:** cada una ya tiene su flujo propio (Pagar tarjeta y la tarjeta de Deuda mami). Tenerlas en dos lugares confundía.
 
-Cuando se guarda algo, aparece un aviso de 6 segundos con **Deshacer**.
+Al guardar algo aparece un aviso de 6 segundos con **Deshacer**. Las pestañas de Agregar caben siempre en una sola fila, sin scroll horizontal, en cualquier ancho de teléfono.
 
 ---
 
-## 7. Deuda mami: cómo se maneja lo de la mamá
+## 9. Deuda mami
 
 Esta fue la parte que más cambió al usar la app, y la regla es simple:
 
@@ -144,34 +202,34 @@ Estos registros de seguimiento **no aparecen como gasto** en el Historial: la co
 
 ---
 
-## 8. Cómo se calculan los saldos
+## 10. Cómo se calculan los saldos
 
 **Los saldos no se guardan: se calculan** recorriendo todos los movimientos. Por eso, si alguien cambia un movimiento a mano en el Sheets, todo se actualiza solo.
 
 - Cada bolsa es un libro: lo que **entró** menos lo que **salió**.
 - La **tarjeta** al revés: su deuda es lo que salió de ella menos lo que entró (los pagos).
-- **Saldo inicial:** las bolsas con dinero real (cajita, Banorte y efectivo) empiezan con una fila de tipo Ajuste, categoría "Saldo inicial", con fecha. Lo que tenga fecha **anterior** a ese saldo ya no mueve el saldo de esa bolsa (pero sí cuenta en el Resumen, porque sigue siendo un gasto de ese periodo). La tarjeta y Deuda mami salen de sus movimientos.
+- **Saldo inicial:** las bolsas con dinero real empiezan con una fila de tipo Ajuste, categoría "Saldo inicial", con fecha. Lo que tenga fecha **anterior** a ese saldo ya no mueve el saldo de esa bolsa (pero sí cuenta en el Resumen, porque sigue siendo un gasto de ese periodo). La tarjeta y Deuda mami salen de sus movimientos.
 - **Datos Dummy:** no cuentan en saldos ni en el Resumen. Se ven en gris con la etiqueta "Dummy". Se usan cuando falta un dato real. Los datos de ejemplo del código **nunca** se escriben en el Sheets.
 - **Dinero:** siempre se guarda en **centavos** (enteros) y se muestra en pesos. Así nunca hay errores de redondeo con decimales.
 - **Fechas:** se guardan como texto `AAAA-MM-DD` y "hoy" es la fecha del teléfono en horario de Ciudad de México, para que un servidor en otra zona horaria no cambie el día.
 
 ---
 
-## 9. Rendimiento de la cajita
+## 11. Rendimiento de la cajita
 
 La cajita de Nu genera rendimiento (hoy 13% anual, editable en Ajustes porque Nu puede cambiarlo). La app lo calcula así:
 
 - **Interés compuesto diario:** cada cantidad que entró a la cajita gana interés desde su fecha hasta hoy: `cantidad × (1 + tasa/365)^días`. Por eso el saldo de la cajita en la app **ya incluye** el rendimiento ganado y coincide con Nu sin tener que ajustar a mano.
-- **Rendimiento hasta tu día de pago** (tarjeta en Inicio): estima cuánto va a ganar la cajita hasta el día que Vanessa planea pagar. El **día de pago** se puede cambiar con un selector de fecha (por defecto, el día antes de la fecha límite). Muestra "Hoy tienes X en la cajita. Para el día tal tendrías Y".
+- **Rendimiento hasta tu día de pago** (tarjeta en Inicio): estima cuánto va a ganar la cajita hasta el día que Vanessa planea pagar. El **día de pago** se cambia con un selector de fecha (por defecto, el día antes de la fecha límite). Muestra "Hoy tienes X en la cajita. Para el día tal tendrías Y".
 - **Ganado en este periodo:** el interés que la cajita ya generó en el periodo actual.
 
 > **Por qué compuesto y no simple:** la propuesta usaba interés simple (`saldo × tasa/365 × días`). Nu capitaliza a diario, así que el compuesto se acerca más al número real. La diferencia son centavos, pero evita que la app y Nu nunca coincidan.
 >
-> **Por qué se quitó el botón "Ajustar cajita":** como el saldo ya incluye el rendimiento calculado, un botón para escribir el saldo real y guardar la diferencia ya no hacía falta. Si Nu cambia la tasa, se edita en Ajustes del Sheets.
+> **Por qué se quitó el botón "Ajustar cajita":** como el saldo ya incluye el rendimiento calculado, escribir el saldo real y guardar la diferencia ya no hacía falta. Si Nu cambia la tasa, se edita en Ajustes del Sheets.
 
 ---
 
-## 10. Cobros esperados (suscripciones y gastos fijos)
+## 12. Cobros esperados (suscripciones)
 
 Las suscripciones se cobran cada mes o cada año a la tarjeta. La app las maneja en dos pasos:
 
@@ -185,69 +243,84 @@ En Inicio, **Próximos cobros** muestra los que caen antes del siguiente corte (
 
 Si pasa el día y no se confirma, sigue como esperado y se marca **Atrasado**.
 
-Los cobros esperados se **suman al pago del día 1** (la línea "Con tus suscripciones, el 1 pagas") pero **no** se restan del dinero libre hasta que se cobran de verdad. La app genera cobros con una regla de **solo agregar**: nunca sobreescribe el estado de un cobro que ya existe (por eso un "Cobrado" nunca vuelve a "Esperado" al sincronizar).
+Los cobros esperados se **suman al pago del día 1** (la línea "Con tus suscripciones, el 1 pagas"), pero **no** se restan del dinero hasta que se cobran de verdad. La app genera cobros con una regla de **solo agregar**: nunca sobreescribe el estado de un cobro que ya existe (por eso un "Cobrado" nunca vuelve a "Esperado" al sincronizar).
 
 > **Por qué se quitó "toca el monto si este mes cambia":** el monto de cada cobro es el de la suscripción. Cambiarlo cobro por cobro era una función poco usada que ocupaba espacio y generaba errores. Si el precio cambia de verdad, se edita en la hoja Gastos fijos.
 >
-> **Por qué las uñas ya no son gasto recurrente:** en la propuesta eran un gasto "cada 3 semanas" con un recordatorio y botones "las pagué yo / las pagó mamá". En la práctica no tienen día fijo y a veces las paga la mamá, así que el recordatorio sobraba. Ahora son un **atajo** de gasto normal (555 con tarjeta). Si las paga la mamá, se registra en Deuda mami como cualquier otra cosa.
+> **Por qué las uñas ya no son gasto recurrente:** en la propuesta eran un gasto "cada 3 semanas" con un recordatorio y botones "las pagué yo / las pagó mamá". En la práctica no tienen día fijo y a veces las paga la mamá, así que el recordatorio sobraba. Ahora son un **atajo** de gasto normal. Si las paga la mamá, se registra en Deuda mami como cualquier otra cosa.
 
 ---
 
-## 11. Atajos
+## 13. Atajos
 
 Los gastos que se repiten (una dona, unos chilaquiles, las uñas) son **atajos**: se registran con un toque. Cada atajo guarda nombre, monto, categoría y con qué se paga. Se crea uno desde cualquier gasto con "Guardar como frecuente". Un atajo puede quedar **sin precio**: la primera vez pide el precio y lo guarda. Hay modo **Editar** para cambiar un precio o borrar un atajo.
 
 ---
 
-## 12. Las pantallas
+## 14. Historial, Resumen y Perfil
 
-La barra de abajo tiene cuatro destinos y un botón central **+**:
+La barra de abajo tiene cuatro destinos y un botón central **+** (que no aparece para quien es de solo lectura).
 
-- **Inicio:** descrita en la sección 4.
-- **Historial:** los movimientos **del periodo actual**, agrupados por día ("Viernes 6 nov"), como en Nu. Tiene filtros: Todo / Gastos / Ingresos, por **bolsa** y por **categoría** (las categorías cambian según el tipo). Se puede cambiar la categoría de un gasto directo en la lista, y "Borrar" un movimiento. Lo que es solo seguimiento de Deuda mami no se lista. Los movimientos anteriores a un saldo inicial se ven atenuados porque solo cuentan en el Resumen.
-- **Resumen:** del **periodo actual**: cuánto se gastó y en cuántos gastos, **en qué se gastó** (gráfica por categoría), los **gastos más grandes** y cuánto entró.
-- **Perfil:** nombre, estado de sincronización ("Sincronizado a las 10:05"), **Sincronizar ahora**, **Abrir el Sheets** y **Respaldo** (descarga un JSON con todo; ambos solo para quien puede editar), avisos de privacidad y términos, y **Cerrar sesión**.
+### Historial
 
-**Categorías:** comida, salidas, transporte, escuela, antojos, pareja, mamá, suscripciones, otros, pendiente y no sé. La categoría **pendiente** sirve para algo que se registra sin saber qué es: Inicio avisa "N gastos por revisar" para que se le ponga categoría después. En los ingresos: horno³, comedor, mamá y otros. Las listas viven en la pestaña Ajustes.
+Los movimientos **del periodo actual** (o del mes, en la versión simple), agrupados por día ("Viernes 6 nov"), como en Nu.
+- Filtros: Todo / Gastos / Ingresos, por **bolsa** y por **categoría** (las categorías cambian según el tipo). En la versión simple también por **lugar**.
+- Se puede cambiar la categoría de un gasto directo en la lista, y **Borrar** un movimiento (solo quien puede editar).
+- Lo que es solo seguimiento de Deuda mami no se lista. Los movimientos anteriores a un saldo inicial se ven atenuados, porque solo cuentan en el Resumen.
+- Un gasto sin categoría clara se marca **pendiente**; Inicio avisa "N gastos por revisar" para ponérsela después.
+
+### Resumen
+
+Del **periodo actual** (o mes): cuánto se gastó y en cuántos gastos, **en qué se gastó** (barras por categoría con monto y porcentaje), **lo más grande** (los tres gastos mayores) y cuánto entró. La versión simple suma "Dónde más gastaste" y "Enviaste a otras personas".
+
+### Perfil
+
+- Nombre, avatar y, si aplica, la etiqueta **"Solo lectura"**.
+- Estado de sincronización ("Sincronizado a las 10:05") y **Sincronizar ahora**.
+- Si hay filas del Sheets con error, un aviso rojo dice cuántas y cuáles.
+- **Abrir el Sheets** y **Respaldo** (descarga un JSON con todo): **solo** para quien puede editar. Mami no los ve.
+- Aviso de privacidad, términos de uso y **Cerrar sesión**.
+
+**Categorías de Vanessa:** comida, salidas, transporte, escuela, antojos, pareja, mamá, suscripciones, otros, pendiente y no sé. En los ingresos: horno³, comedor, mamá y otros. Las listas viven en la pestaña Ajustes y se editan ahí.
 
 ---
 
-## 13. Usuarios: quién entra y qué puede hacer
+## 15. La versión de Francisco (simple, por mes)
 
-Cada persona entra con **usuario y contraseña** y usa la app en su propio teléfono.
+Francisco no usa tarjeta de crédito, cajita ni Deuda mami. Tiene **una cuenta de BBVA y algo de efectivo**, donde le depositan su mamá y su papá, y quiere ver **en qué gasta**. Por eso su app tiene un **layout simple**: la misma app con menos piezas, que se activa por usuario.
 
-| Usuario | Qué ve | Qué puede hacer |
-| --- | --- | --- |
-| **Vanessa** (dueña) | Su propio Sheets | Todo |
-| **Mami** (solo lectura) | El Sheets de Vanessa | Solo mirar: no agrega, no borra, no abre el Sheets ni descarga respaldos |
-| **Francisco** | Su propio Sheets | Todo, en su espacio |
-
-### La versión simple de Francisco
-
-Francisco no usa tarjeta de crédito, cajita ni Deuda mami: tiene **una cuenta de BBVA y algo de efectivo** donde le depositan su mamá y su papá, y quiere ver **en qué gasta**. Por eso su app tiene un **layout simple**, que es la misma app con menos piezas:
-
+**Lo que cambia respecto a la de Vanessa**
 - **Dos lugares para el dinero: su BBVA y el efectivo.** Los gastos e ingresos preguntan cuál (BBVA ya viene elegido), y **Mover** pasa dinero entre ellos, por ejemplo al sacar del cajero.
-- **Por mes de calendario**, no por periodos de tarjeta. Por dentro es el mismo cálculo de periodos con el día de corte en 1.
-- **Inicio:** cuánto tiene en total (con BBVA y efectivo por separado), cuánto gastó y cuánto le entró este mes, y en qué gastó (gráfica por categoría). Sus saldos iniciales ya están en su Sheets; si faltara alguno, la app lo pide.
-- **Agregar:** **Gasto**, **Ingreso** ("Me depositaron"), **Mover** y **Transferí**, con atajos para lo que repite (bread de pan de chocolate, snacks de 7-Eleven, gym day pass, corte de pelo, gasolina).
-- **Categorías de gasto:** dates, salidas, antojos de Vane, antojos míos, snacks, bread, gym, higiene, gasolina, cortes de pelo, shopping, otros y pendiente. Las edita en la pestaña Ajustes de su Sheets. **Ingresos:** mamá, papá y otros. Para que la lista no sature, el formulario muestra primero las 6 más usadas y el resto queda detrás de "Ver todas".
-- **Lugares:** en las categorías donde tiene sentido (dates, salidas, antojos y snacks, bread) aparece una fila de botones con sus lugares frecuentes (Shake Shack, Galleta Moonwalk, Carl's Jr, Wingstop, Super Salads, Elite Cinema, Cinépolis). Los más usados salen primero y solo se ven 8. Puede escribir otro lugar ahí mismo, y si lo escribe dos veces, se vuelve botón. La lista y las categorías con lugar viven en las columnas L y M de Ajustes, y el lugar se guarda en la Nota del movimiento.
-- **Transferí:** dinero que le manda a otra persona (Vanessa, Mamá, Papá u otra). Sale de su BBVA pero **no cuenta como gasto**: en el Resumen aparece aparte, como "Enviaste a otras personas".
-- **Resumen:** gasto por categoría, "Dónde más gastaste este mes" (lugares), lo enviado a otras personas y lo que le entró. Historial tiene filtro por lugar.
-- **Su Sheets** muestra solo Movimientos, Atajos, Ajustes y **Resumen del mes**. Las pestañas que la app usa por dentro (Gastos fijos, Pagos esperados y Cortes) están escondidas.
+- **Por mes de calendario**, no por periodos de tarjeta. Por dentro es el mismo cálculo de periodos con el día de corte en 1. No aparece "Se paga el".
+- **Sin** tarjeta, cajita, Deuda mami, Pagar tarjeta ni rendimiento.
 
-- **Todos los Sheets viven en la cuenta de Google de Vanessa.** El de su novio se le comparte a su correo para que él también lo pueda abrir.
-- **El modo de solo lectura se aplica en el servidor**, no solo escondiendo botones: si llegara un cambio desde la cuenta de solo lectura, el servidor lo rechaza.
-- **Cada persona tiene su propia copia en el teléfono** (una base de datos local por usuario), así que si dos comparten un dispositivo, sus datos no se mezclan.
-- Si el Sheets de alguien todavía no está conectado, la app dice "Tu espacio todavía no está listo" y Perfil sigue abierto para sincronizar o cerrar sesión.
+**Inicio:** "Tienes en total", con BBVA y efectivo por separado; cuánto gastó y cuánto le entró este mes; en qué gastó (barras por categoría); y "Dónde más gastas" (sus tres lugares principales). Sus saldos iniciales ya están en su Sheets (BBVA y efectivo); si faltara alguno, la app lo pide en un recuadro.
 
-> **Por qué usuario y contraseña y no Google:** así su mamá y su novio no necesitan cuenta de Google, y todos los datos quedan en la cuenta de Vanessa. El cambio sustituyó al selector de perfiles anterior, que no era un candado.
+**Agregar:** cuatro pestañas.
+- **Gasto** e **Ingreso** ("Me depositaron").
+- **Mover**: entre BBVA y efectivo.
+- **Transferí**: dinero que le manda a otra persona (Vanessa, Mamá, Papá u otra que escriba). Sale de su BBVA pero **no cuenta como gasto**; en el Resumen aparece aparte como "Enviaste a otras personas". Las personas a las que ya mandó salen después como botones.
+- Atajos con un toque: bread de pan de chocolate, snacks de 7-Eleven, gym day pass, corte de pelo y gasolina (la primera vez piden el precio).
+
+**Categorías de gasto:** dates, salidas, antojos de Vane, antojos míos, snacks, bread, gym, higiene, gasolina, cortes de pelo, shopping, otros y pendiente. **Ingresos:** mamá, papá y otros. Para no saturar, el formulario muestra primero las **6 más usadas** y el resto queda detrás de "Ver todas".
+
+> **Por qué "salidas" y "dates" son distintas:** "dates" es salir los dos; "salidas" es con amigos, incluso si él paga por los dos. Y "antojos de Vane" separa lo que él le compra a ella de sus propios antojos.
+
+**Lugares.** Debajo de la categoría, en las que lo piden (dates, salidas, antojos y snacks, bread), aparece una fila de botones con lugares frecuentes: Shake Shack, Galleta Moonwalk, Carl's Jr, Wingstop, Super Salads, Elite Cinema y Cinépolis.
+- Los más usados salen primero y solo se ven 8.
+- Puede **escribir otro lugar** ahí mismo; si lo escribe dos veces, se vuelve botón.
+- El lugar se guarda en la **Nota** del movimiento. La lista y las categorías que piden lugar viven en las columnas L y M de Ajustes.
+- Con eso, el Resumen e Inicio muestran **dónde más gasta**, y el Historial se filtra por lugar.
+
+> **Por qué lugares como botones y no texto libre:** si escribiera "Shake Shack" de tres formas distintas, no se podría sumar. Los botones mantienen el nombre igual y ahorran escribir.
+
+**Su Sheets** muestra solo **Movimientos, Atajos, Ajustes y Resumen del mes**. Gastos fijos, Pagos esperados y Cortes existen pero están escondidos, porque la app los usa por dentro. Su Resumen del mes trae: gasto por categoría (este mes contra el pasado), lo que entró, lo que gastó, lo que envió a otras personas y su saldo en BBVA, en efectivo y en total.
 
 ---
 
-## 14. Google Sheets como base de datos
+## 16. Google Sheets como base de datos
 
-El Sheets **es la fuente de verdad**: la app escribe ahí cada cambio y lee lo que alguien cambie a mano. No hay otra base de datos.
+El Sheets **es la fuente de verdad**: la app escribe ahí cada cambio y lee lo que alguien cambie a mano. No hay otra base de datos. Cada persona tiene el suyo, con **la misma estructura de pestañas**.
 
 ### Pestañas de datos (la app lee y escribe)
 
@@ -258,13 +331,14 @@ El Sheets **es la fuente de verdad**: la app escribe ahí cada cambio y lee lo q
 | **Pagos esperados** | ID, Gasto fijo, Nombre, Fecha, Monto, Categoría, Estado (+ "Se paga el", calculada) | Los cobros que genera la app. |
 | **Cortes** | Fecha de corte, Fecha límite, Estado de cuenta (+ columnas calculadas) | El monto de cada estado de cuenta. **La app solo lo lee.** |
 | **Atajos** | ID, Nombre, Monto, Categoría, Se paga con | Gastos frecuentes. |
-| **Ajustes** | Límite de la tarjeta, Día de corte, Día límite de pago, Tasa anual de la cajita, Día de pago + listas de categorías, bolsas, tipos, estados y datos | Configuración y las listas de los menús desplegables. |
+| **Ajustes** | Valores en B2:B6 (límite de tarjeta, día de corte, día límite de pago, tasa, día de pago) y listas en E (gasto), F (ingreso), G (bolsas), H (tipos), I (estados), J (dato), K (todas las categorías), L (lugares) y M (categorías con lugar) | Configuración y las listas de los menús desplegables. |
 
 ### Pestañas de vista (solo para mirar)
 
-**Resumen del periodo**, **Gastos fijos por periodo** e **Ingresos por quincena**: se calculan solas con fórmulas y la app **nunca** escribe en ellas. Están protegidas contra edición accidental.
+- **Vanessa:** **Resumen del periodo**, **Gastos fijos por periodo** e **Ingresos por quincena**.
+- **Francisco:** **Resumen del mes**.
 
-> **Por qué agrupan por periodo y no por mes:** estas vistas usan los mismos periodos de tarjeta (del 22 al 21) que la app, así que los totales de "Este periodo" coinciden con la pantalla Resumen. El día de corte sale de la pestaña Ajustes: si cambia, las vistas se acomodan solas. Los resaltados de color (periodo actual en amarillo, anteriores en verde) también siguen el periodo. "Ingresos por quincena" no agrupa por periodo, sino por día de pago (14 y 29).
+Se calculan solas con fórmulas, la app **nunca** escribe en ellas, y están protegidas contra edición accidental. Las de Vanessa usan los mismos periodos de tarjeta (del 22 al 21) que la app, así que los totales coinciden con la pantalla Resumen. El día de corte sale de Ajustes: si cambia, las vistas se acomodan solas. "Ingresos por quincena" no agrupa por periodo, sino por día de pago (14 y 29).
 
 ### Reglas para editar a mano
 
@@ -272,38 +346,43 @@ El Sheets **es la fuente de verdad**: la app escribe ahí cada cambio y lee lo q
 - Si agregas una fila, deja el ID vacío: la app se lo pone.
 - Los menús desplegables evitan equivocarse en tipo, bolsa, categoría, estado y dato.
 - Una fila con error (monto con letras, tipo inexistente, bolsa que no existe) **se marca y no se cuenta** hasta corregirla. La app no se rompe: muestra cuántas filas tienen problema.
+- Una fila con una casilla "Activo" marcada pero sin nombre, monto ni ID se toma como un gasto fijo incompleto y se reporta como error. Si no es gasto, desmarca la casilla.
 - Un dato de relleno se marca **Dummy** en la columna Dato.
 
-Las tablas se ven bien a propósito: encabezados oscuros, el mes actual resaltado, montos con formato de pesos, primera fila y columna fijas, estados con color (Esperado amarillo, Cobrado verde, Omitido gris, atrasado rojo).
+Las tablas se ven bien a propósito: encabezados oscuros, el periodo (o mes) actual resaltado en amarillo y los anteriores en verde, montos con formato de pesos, primera fila y columna fijas, y estados con color (Esperado amarillo, Cobrado verde, Omitido gris, atrasado rojo).
 
 ---
 
-## 15. Cómo se sincroniza (sin perder nada)
+## 17. Cómo se sincroniza
 
 La app es **offline-first**: funciona sin internet y sincroniza cuando puede.
 
-1. Toda la información se guarda también en el teléfono (**IndexedDB**, con la librería **Dexie**). Por eso abre rápido y se puede usar sin conexión.
-2. Cada cambio que Vanessa hace se anota en una **bandeja de salida (outbox)** con el cambio concreto: "agrega este movimiento", "borra estos", "agrega estos cobros", etc.
-3. **Sincronizar** = mandar la bandeja de salida a una función del servidor (`/api/sync`), que la escribe en el Sheets, y **leer todo el Sheets** de vuelta.
-4. La app sincroniza al abrirse, cada vez que se vuelve a ella, al recuperar internet y después de cada cambio.
+1. Toda la información se guarda también en el teléfono (**IndexedDB**, con la librería **Dexie**), **una base de datos por persona**. Por eso abre rápido, se puede usar sin conexión, y si dos personas comparten un teléfono sus datos no se mezclan.
+2. Cada cambio se anota en una **bandeja de salida (outbox)** con el cambio concreto: "agrega este movimiento", "borra estos", "agrega estos cobros", etc.
+3. **Sincronizar** = mandar la bandeja a una función del servidor (`/api/sync`), que la escribe en el Sheets de esa persona, y **leer todo el Sheets** de vuelta.
+4. Se sincroniza al abrirse la app, cada vez que se vuelve a ella, al recuperar internet y después de cada cambio.
 5. **El Sheets gana**: lo que vuelve del Sheets reemplaza la copia del teléfono, pero los cambios que todavía no se habían subido se vuelven a aplicar encima (así nada se pierde si se hizo algo sin internet).
 6. Un cambio pendiente solo se descarta de la bandeja cuando el servidor confirmó que lo escribió.
+7. **Solo lectura:** la cuenta de Mami nunca manda cambios; solo recibe el Sheets. Si algún cambio llegara a su sesión, el servidor lo rechaza.
 
-El servidor **valida cada cambio** que llega del navegador campo por campo antes de tocar el Sheets (nunca confía en lo que mande el teléfono). Un aviso delgado arriba indica cuando algo necesita atención: "Sin internet · 2 cambios por subir", "Tu sesión terminó…", "Tu Sheets todavía no está listo" o "No se pudo sincronizar".
+El servidor **valida cada cambio** que llega del navegador, campo por campo, antes de tocar el Sheets (nunca confía en lo que mande el teléfono). Un aviso delgado arriba indica cuando algo necesita atención: "Sin internet · 2 cambios por subir", "Tu sesión terminó, vuelve a entrar", "Tu Sheets todavía no está listo" o "No se pudo sincronizar".
 
 ---
 
-## 16. Cuentas, permisos y seguridad
+## 18. Seguridad y permisos
 
 - **Usuario y contraseña** con **Auth.js**. Las contraseñas **nunca se guardan**: solo un hash con `scrypt` y una "sal" aleatoria, que no se puede revertir. Se crean con `npm run hash-password`, que pide la contraseña sin mostrarla y solo imprime el hash. La comparación se hace en tiempo constante.
 - **La sesión** es una cookie cifrada que solo guarda el id de la persona; el navegador no la puede leer (httpOnly). Quitar el hash de alguien de las variables de entorno cierra sus sesiones.
 - **Acceso al Sheets con una cuenta de servicio de Google:** un "robot" que solo ve los Sheets que se le comparten. Su llave privada vive **solo** en las variables de entorno del servidor (Vercel y `.env.local`), nunca en el código, en Git ni en el navegador. El servidor pide con ella permisos de una hora y los renueva solo.
-- **El ID de cada Sheets y los hashes** van en variables de entorno. El archivo `.env.example` lista los nombres de las variables, sin valores.
-- Cada pedido al servidor revisa quién es y qué puede hacer; el navegador solo conoce el nombre, el id, el rol y el color de quien entró.
+- **El navegador solo conoce** el nombre, el id, el rol, el layout y el color de quien entró; nunca llaves ni contraseñas.
+- **Cada pedido al servidor** revisa quién es y qué puede hacer.
+- **El modo de solo lectura se aplica en el servidor**, no solo escondiendo botones.
+- **Lo que no está en el código:** contraseñas, llaves, IDs de Sheets ni datos personales de ejemplo. Antes de cada commit se revisa que no se cuele ningún secreto, y `.env.local` está excluido de Git.
+- La conexión vieja con Google (inicio de sesión con la cuenta de Google) se **eliminó por completo**, junto con sus credenciales.
 
 ---
 
-## 17. Cómo está construido el código
+## 19. Cómo está construido y cómo operarlo
 
 **Stack:** Next.js (App Router), React, TypeScript y Tailwind. Despliegue en Vercel (cada push a `main` publica). Reglas del proyecto: nada de `any`, componentes con una sola responsabilidad, código y comentarios en inglés, interfaz en español.
 
@@ -311,33 +390,57 @@ La separación por capas es la decisión de arquitectura más importante:
 
 | Carpeta | Qué contiene | Por qué |
 | --- | --- | --- |
-| `src/domain` | **Lógica pura**: libro de saldos, periodos, estado de la tarjeta, rendimiento, cobros esperados, mapeo de filas del Sheets, validación de cambios. Sin React ni red. | Es lo que más importa y lo más fácil de equivocarse. Al ser funciones puras se prueba rápido y con certeza. |
-| `src/services` | Repositorio (Dexie + bandeja de salida), acciones de la app, sincronización. | Separa "qué hace la app" de "dónde se guarda". |
-| `src/server` | Todo lo que corre solo en el servidor: contraseñas, sesión, cuenta de servicio, cliente de Sheets, lectura/escritura por pestaña. | Las llaves y permisos nunca llegan al navegador. |
-| `src/components` | Pantallas y piezas visuales, por pantalla (`home`, `add`, `history`, `summary`, `profile`, `sync`, `ui`). | Interfaz sin lógica de negocio. |
-| `src/data` | Datos iniciales de ejemplo (categorías, atajos, gastos fijos). | Solo se usan la primera vez; nunca se escriben en el Sheets. |
-| `src/app` | Rutas (Inicio, Agregar, Historial, Resumen, Perfil, privacidad, términos), API de sesión y de sincronización, manifiesto e íconos. | Estructura estándar de Next.js. |
+| `src/domain` | **Lógica pura**: libro de saldos, periodos, estado de la tarjeta, rendimiento, cobros esperados, lugares, usuarios y roles, mapeo de filas del Sheets, validación de cambios. Sin React ni red. | Es lo que más importa y lo más fácil de equivocarse. Al ser funciones puras se prueba rápido y con certeza. |
+| `src/services` | Repositorio (Dexie + bandeja de salida, uno por persona), acciones de la app, sincronización, sesión del navegador. | Separa "qué hace la app" de "dónde se guarda". |
+| `src/server` | Todo lo que corre solo en el servidor: contraseñas, sesión, cuenta de servicio, cliente de Sheets, lectura y escritura por pestaña. | Las llaves y permisos nunca llegan al navegador. |
+| `src/components` | Pantallas y piezas visuales, por área (`home`, `add`, `history`, `summary`, `profile`, `sync`, `ui`). | Interfaz sin lógica de negocio. |
+| `src/data` | Valores por defecto (categorías, ajustes) para un teléfono que aún no sincroniza. | Los datos reales solo salen del Sheets de cada persona. |
+| `src/app` | Rutas (Inicio, Agregar, Historial, Resumen, Perfil, privacidad, términos), API de sesión, de quién eres (`/api/me`) y de sincronización, manifiesto e íconos. | Estructura estándar de Next.js. |
+| `scripts` | `hash-password`, para cifrar contraseñas. | Para que la contraseña real nunca pase por el código. |
 
-**Pruebas:** hay pruebas automáticas sobre la lógica de dominio y el mapeo del Sheets (saldos, periodos, tarjeta, rendimiento, cobros, lectura de filas, validación de cambios). Se corren con `npm test`.
+**Pruebas:** hay pruebas automáticas sobre la lógica de dominio y el mapeo del Sheets (saldos, periodos, tarjeta, rendimiento, cobros, lugares, usuarios, contraseñas, lectura de filas, validación de cambios). Se corren con `npm test`.
 
 **Cómo correrlo:**
 
 ```bash
 npm install
-npm run dev        # servidor local en http://localhost:3000
-npm test           # pruebas
-npm run typecheck  # revisión de tipos
-npm run lint       # estilo
-npm run build      # versión de producción
+npm run dev            # servidor local en http://localhost:3000
+npm test               # pruebas
+npm run typecheck      # revisión de tipos
+npm run lint           # estilo
+npm run build          # versión de producción
+npm run hash-password  # cifra una contraseña (no se muestra al escribirla)
 ```
 
-Para correrla en local hace falta un archivo `.env.local` con las variables de `.env.example`: `AUTH_SECRET`, la llave de la cuenta de servicio, el ID de cada Sheets y el hash de cada contraseña.
+**Variables de entorno** (solo los nombres; los valores van en `.env.local` y en Vercel, nunca en Git):
 
-**Instalarla en iPhone:** abrir la dirección de Vercel en Safari → Compartir → "Agregar a pantalla de inicio". El manifiesto (`manifest.ts`) le da nombre, íconos y colores, y la abre a pantalla completa.
+| Variable | Para qué |
+| --- | --- |
+| `AUTH_SECRET` | Cifrar la cookie de sesión |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Correo del "robot" de Google |
+| `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | Llave privada del robot (la más delicada) |
+| `GOOGLE_SHEETS_ID` | Sheets de Vanessa (que también lee Mami) |
+| `GOOGLE_SHEETS_ID_FRANCISCO` | Sheets de Francisco |
+| `PASSWORD_HASH_VANESSA`, `PASSWORD_HASH_MAMI`, `PASSWORD_HASH_FRANCISCO` | Contraseñas cifradas |
+
+**Para agregar a una persona nueva:**
+1. Darle una entrada en `src/domain/users.ts` (usuario, nombre, rol, layout, color y los nombres de sus variables).
+2. Crear su Sheets (copia limpia de la estructura) y compartirlo con el robot como Editor.
+3. Cifrar su contraseña con `npm run hash-password` y guardar el hash.
+4. Agregar el hash y el ID de su Sheets como variables en `.env.local` y en Vercel.
+5. Subir el cambio y probar que entra.
+
+**Si algo falla:**
+- *"El usuario o la contraseña no coinciden":* el hash de esa persona falta o está mal copiado en las variables.
+- *"Tu espacio todavía no está listo":* falta la variable del Sheets, o el Sheets no está compartido con el robot.
+- *"Tu sesión terminó":* cerrar sesión y volver a entrar.
+- *Filas con error en Perfil:* corregir esas filas en el Sheets (el aviso dice pestaña y número de fila).
+
+**Instalarla en iPhone:** abrir la dirección de Vercel en Safari → Compartir → "Agregar a pantalla de inicio". El manifiesto le da nombre, íconos y colores, y la abre a pantalla completa. Cada persona ve **solo su espacio**.
 
 ---
 
-## 18. Qué cambió respecto a la propuesta original (y por qué)
+## 20. Qué cambió respecto a la propuesta original (y por qué)
 
 | En la propuesta | Hoy | Por qué |
 | --- | --- | --- |
@@ -349,36 +452,41 @@ Para correrla en local hace falta un archivo `.env.local` con las variables de `
 | Pagar la tarjeta con varias fuentes | **Un solo monto, siempre desde la cajita** | Se usa 1–2 veces al mes y siempre sale de ahí. |
 | Ajuste de saldo de la cajita | **Eliminado**; el rendimiento compuesto ya está en el saldo | Evita capturar saldos a mano. |
 | Rendimiento simple | **Interés compuesto diario** | Se parece más al número real de Nu. |
-| Meses de calendario ("este mes y el pasado") | **Periodos de tarjeta** (22 al 21) | Coincide con Nu y con lo que se paga el día 1. |
+| Meses de calendario ("este mes y el pasado") | **Periodos de tarjeta** (22 al 21) para Vanessa; mes de calendario para Francisco | Coincide con Nu y con lo que se paga el día 1; Francisco no tiene tarjeta. |
 | Uñas como gasto recurrente cada 3 semanas | **Atajo de gasto normal** | No tienen día fijo; el recordatorio sobraba. |
 | Cambiar el monto de un cobro "solo este mes" | **Eliminado** | Poco usado; si cambia el precio, se edita el gasto fijo. |
 | "Cajita Turbo" y "Tarjeta Nu" | **Cajita Nu Débito** y **Tarjeta Nu crédito** | Nombres más claros. |
-| 4 pantallas | 4 pantallas + **Perfil** | Sincronización, respaldo y cerrar sesión. |
-| Entrar con Google | **Usuario y contraseña** por persona, Sheets por persona, mamá en solo lectura | Que la familia la use sin cuentas de Google y con todo en la cuenta de Vanessa. |
+| 4 pantallas | 4 pantallas + **Perfil**, y una **versión simple** para otra persona | Sincronización, respaldo, cerrar sesión y un segundo usuario con otras necesidades. |
+| Entrar con Google | **Usuario y contraseña** por persona, un Sheets por persona, Mami en solo lectura | Que la familia la use sin cuentas de Google y con todo en la cuenta de Vanessa. |
+| Un solo Sheets para una sola persona | **Un Sheets por persona**, con la misma estructura | Cada quien ve solo lo suyo. |
 | Gasto fijo "cada N días" en el Sheets | **Solo Mensual o Anual** | Sin uñas recurrentes ya no se usaba. |
 | Atajos enlazados a un gasto fijo | **Atajos simples** | Estaban ligados a las uñas recurrentes. |
+| Días de quincena y plan de pago con montos en Ajustes | **Quitados**; solo queda el **Día de pago** | Ya no se usaban. |
 | Avisos (push, quincena, pagar tarjeta) | **No construidos todavía** | Quedan como mejora futura; hoy hay un aviso de sincronización y el de "gastos por revisar". |
 | Service worker para uso sin internet | **No construido todavía**; los datos sí funcionan sin internet gracias a Dexie | Pendiente: guardar también la app en sí. |
-| Días de quincena y plan de pago con montos en Ajustes | **Quitados**; solo queda el **Día de pago** | Ya no se usaban. |
 
 ---
 
-## 19. Lo que falta o se puede mejorar
+## 21. Lo que falta o se puede mejorar
 
-- **Ver periodos anteriores** en Inicio, Historial y Resumen.
+- **Ver periodos anteriores** en Inicio, Historial y Resumen, cuando ya haya periodos completos con su información.
 - **Service worker** para que la app abra aunque no haya internet, y **avisos** (pagar la tarjeta, quincena, próximos cobros) con notificaciones push.
+- **Francisco:** gastos fijos propios (por ejemplo el gym mensual), un total de "gastado en Vane" (dates más antojos de ella) y lo que él vaya pidiendo al usarla.
+- **Revisar el 22 de noviembre** (primer corte con la app): capturar el estado de cuenta real en la pestaña Cortes y comparar con Nu.
+- Un **PIN** adicional para quien lo quiera.
 
 ---
 
-## 20. Las decisiones clave, en una lista
+## 22. Las decisiones clave
 
 1. **El Sheets es la verdad**, la app es una ventana rápida con copia local.
 2. **Los saldos se calculan, no se guardan.** Una sola fuente (los movimientos) y cero números desincronizados.
-3. **La tarjeta es deuda, no dinero.** Y la deuda mami no es dinero real hasta que regresa.
-4. **Todo se lee en periodos de tarjeta**, igual que Nu.
-5. **Cada acción tiene un solo lugar:** pagar la tarjeta, mover dinero, apuntar lo de mamá, ingresos. Menos pasos, menos confusión.
+3. **La tarjeta es deuda, no dinero.** Y Deuda mami no es dinero real hasta que regresa.
+4. **Todo se lee en periodos de tarjeta** para quien tiene tarjeta, y por mes para quien no.
+5. **Cada acción tiene un solo lugar:** pagar la tarjeta, mover dinero, apuntar lo de mamá, ingresos, transferir. Menos pasos, menos confusión.
 6. **La mamá nunca paga directo:** Vanessa paga y ella regresa; lo extra es un ingreso a Banorte.
-7. **Offline-first con "el Sheets gana":** nada se pierde sin internet y los conflictos tienen una regla clara.
-8. **Seguridad en el servidor:** contraseñas solo como hash, llaves solo en el servidor, permisos revisados en cada pedido y cada cambio validado.
-9. **Lógica pura y probada**, separada de la interfaz y de dónde se guardan los datos.
-10. **Si no se usa, no se deja:** la app y el Sheets se mantienen limpios y con los mismos nombres y la misma estructura.
+7. **Un layout por necesidad:** la misma app se adapta a cada persona sin mostrar lo que no usa.
+8. **Offline-first con "el Sheets gana":** nada se pierde sin internet y los conflictos tienen una regla clara.
+9. **Seguridad en el servidor:** contraseñas solo como hash, llaves solo en el servidor, permisos revisados en cada pedido y cada cambio validado.
+10. **Lógica pura y probada**, separada de la interfaz y de dónde se guardan los datos.
+11. **Si no se usa, no se deja:** la app y los Sheets se mantienen limpios y con los mismos nombres y la misma estructura.
