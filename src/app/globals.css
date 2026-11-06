@@ -37,7 +37,6 @@
   --tarjeta-soft: #e6eefa;
 
   --chart-current: #2a78d6;
-  --chart-previous: #eb6834;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -73,7 +72,6 @@
     --tarjeta-soft: #1b2a3f;
 
     --chart-current: #3987e5;
-    --chart-previous: #d95926;
   }
 }
 
@@ -106,7 +104,6 @@
   --color-tarjeta: var(--tarjeta);
   --color-tarjeta-soft: var(--tarjeta-soft);
   --color-chart-current: var(--chart-current);
-  --color-chart-previous: var(--chart-previous);
   --font-sans: var(--font-geist-sans);
 }
 

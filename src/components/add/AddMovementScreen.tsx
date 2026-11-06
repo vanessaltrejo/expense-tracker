@@ -4,27 +4,26 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useFinance } from "../FinanceProvider";
-import { AdjustmentForm } from "./AdjustmentForm";
 import { MovementForm, type MovementFormKind } from "./MovementForm";
 import { PaymentForm } from "./PaymentForm";
 import { ShortcutList } from "./ShortcutList";
+import { TransferForm } from "./TransferForm";
 
-type AddTab = MovementFormKind | "payment" | "adjustment";
+type AddTab = MovementFormKind | "transfer" | "payment";
 
-const TABS: { id: AddTab; label: string; param: string }[] = [
-  { id: "expense", label: "↑ Gasto", param: "gasto" },
-  { id: "income", label: "↓ Ingreso", param: "ingreso" },
-  { id: "transfer", label: "⇄ Mover", param: "mover" },
-  { id: "payment", label: "✓ Pagar tarjeta", param: "pago" },
-  { id: "adjustment", label: "≈ Ajustar cajita", param: "ajuste" },
+const TABS: { id: AddTab; icon: string; label: string; param: string }[] = [
+  { id: "expense", icon: "↑", label: "Gasto", param: "gasto" },
+  { id: "income", icon: "↓", label: "Ingreso", param: "ingreso" },
+  { id: "transfer", icon: "⇄", label: "Mover", param: "mover" },
+  { id: "payment", icon: "✓", label: "Pagar tarjeta", param: "pago" },
 ];
 
 const TAB_HELP: Record<AddTab, string> = {
-  expense: "Algo que pagaste. Casi siempre es con tu Tarjeta Nu, y eso sube tu deuda.",
-  income: "Dinero que te llegó: horno³, comedor o tu mamá.",
-  transfer: "Mover dinero entre tus bolsas. No es un gasto.",
-  payment: "Lo que abonaste a la tarjeta. Puedes pagar en varias partes.",
-  adjustment: "Pon el saldo real de Nu y la diferencia se guarda como rendimiento.",
+  expense: "Algo que pagaste. Casi siempre es con tu Tarjeta Nu crédito, y eso sube tu deuda.",
+  income: "Dinero que te llegó: horno³, comedor, tu mamá u otros. Lo de tu mamá siempre cae en Banorte.",
+  transfer:
+    "Mover dinero entre tus bolsas. No es un gasto.",
+  payment: "Lo que abonaste a la tarjeta, siempre de tu Cajita Nu Débito. Puedes pagar en varias partes.",
 };
 
 function AddMovementContent({ initialTab }: { initialTab: AddTab }) {
@@ -37,7 +36,7 @@ function AddMovementContent({ initialTab }: { initialTab: AddTab }) {
       <div
         role="radiogroup"
         aria-label="Tipo de movimiento"
-        className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]"
+        className="flex gap-1.5"
       >
         {TABS.map((item) => (
           <button
@@ -45,10 +44,11 @@ function AddMovementContent({ initialTab }: { initialTab: AddTab }) {
             type="button"
             role="radio"
             aria-checked={tab === item.id}
-            className="chip shrink-0"
+            className="chip min-w-0 flex-auto gap-1 whitespace-nowrap px-2 text-[clamp(0.6875rem,3.4vw,0.875rem)]"
             onClick={() => setTab(item.id)}
           >
-            {item.label}
+            <span aria-hidden="true">{item.icon}</span>
+            <span>{item.label}</span>
           </button>
         ))}
       </div>
@@ -56,8 +56,8 @@ function AddMovementContent({ initialTab }: { initialTab: AddTab }) {
 
       {tab === "expense" ? <ShortcutList /> : null}
       {tab === "payment" ? <PaymentForm /> : null}
-      {tab === "adjustment" ? <AdjustmentForm /> : null}
-      {tab !== "payment" && tab !== "adjustment" ? (
+      {tab === "transfer" ? <TransferForm /> : null}
+      {tab === "expense" || tab === "income" ? (
         // The key resets the form so nothing typed carries over to another type.
         <MovementForm key={tab} kind={tab} />
       ) : null}

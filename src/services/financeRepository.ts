@@ -35,7 +35,6 @@ export interface FinanceRepository {
   saveExpectedCharges(charges: ExpectedCharge[]): Promise<void>;
   /** For charges the app generated: never overwrites one the sheet already has. */
   addGeneratedCharges(charges: ExpectedCharge[]): Promise<void>;
-  saveFixedExpense(expense: FixedExpense): Promise<void>;
   saveShortcut(shortcut: Omit<Shortcut, "id"> & { id?: string }): Promise<Shortcut>;
   deleteShortcut(id: string): Promise<void>;
   savePaymentPlan(plan: PaymentPlan): Promise<void>;
@@ -232,13 +231,6 @@ class DexieFinanceRepository implements FinanceRepository {
     });
   }
 
-  async saveFixedExpense(expense: FixedExpense): Promise<void> {
-    await this.change(async () => {
-      await this.db.fixedExpenses.put(expense);
-      return { kind: "upsertFixedExpense", expense };
-    });
-  }
-
   async saveShortcut(
     shortcut: Omit<Shortcut, "id"> & { id?: string },
   ): Promise<Shortcut> {
@@ -338,9 +330,6 @@ async function applyLocally(tx: Transaction, op: SyncOp): Promise<void> {
       await table.bulkPut(op.charges.filter((charge) => !existing.has(charge.id)));
       break;
     }
-    case "upsertFixedExpense":
-      await tx.table<FixedExpense, string>("fixedExpenses").put(op.expense);
-      break;
     case "upsertShortcut":
       await tx.table<Shortcut, string>("shortcuts").put(op.shortcut);
       break;

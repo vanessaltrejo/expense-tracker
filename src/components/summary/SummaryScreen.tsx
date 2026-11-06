@@ -25,9 +25,6 @@ export function SummaryScreen() {
         <p className="amount -mt-2 text-3xl font-semibold">{formatMoney(summary.totalSpent)}</p>
         <p className="text-sm text-ink-soft">
           {summary.expenseCount === 1 ? "1 gasto" : `${summary.expenseCount} gastos`}
-          {summary.paidByMom > 0
-            ? ` · ${formatMoney(summary.paidByMom)} los pagó tu mamá`
-            : ""}
         </p>
       </section>
 

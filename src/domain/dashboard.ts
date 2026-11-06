@@ -2,7 +2,6 @@ import { type CardStatus, getCardStatus, getCutForDate } from "./billing.ts";
 import { addDays, daysBetween } from "./dates.ts";
 import { dailyGrowth, getLedgerBalances, YIELD_CATEGORY } from "./ledger.ts";
 import { getPeriodForDate, isInPeriod, type Period } from "./periods.ts";
-import { getIntervalReminders, type IntervalReminder } from "./recurring.ts";
 import type {
   AppData,
   Cents,
@@ -63,13 +62,6 @@ function getYieldCorrections(movements: Movement[], start: IsoDate, end: IsoDate
 }
 
 export interface PlanView {
-  plan: PaymentPlan;
-  reserved: Cents;
-  /** How much of the amount to pay still has no money reserved for it. */
-  unassigned: Cents;
-  /** A reserved source that is bigger than what its pocket holds right now. */
-  cajitaShort: Cents;
-  cashShort: Cents;
   plannedDate: IsoDate;
   daysUntilPayment: number;
 }
@@ -85,8 +77,6 @@ export interface Dashboard {
   free: Cents;
   /** Card debt not yet covered by real money. Mom's loan doesn't pay the card until it comes back. */
   toCoverDebt: Cents;
-  /** The same, counting the expected charges of this month. */
-  expectedThisPeriod: Cents;
   upcomingCharges: ExpectedCharge[];
   creditLeft: Cents;
   card: CardStatus;
@@ -96,28 +86,11 @@ export interface Dashboard {
   estimatedYield: Cents;
   cajitaOnPaymentDay: Cents;
   yieldThisPeriod: Cents;
-  intervalReminders: IntervalReminder[];
 }
 
-function buildPlanView(
-  plan: PaymentPlan,
-  balances: Record<PocketId, Cents>,
-  projectedDue: Cents,
-  dueDate: IsoDate,
-  today: IsoDate,
-): PlanView {
-  const reserved = plan.fromCajita + plan.fromCash + plan.momGift;
+function buildPlanView(plan: PaymentPlan, dueDate: IsoDate, today: IsoDate): PlanView {
   const plannedDate = plan.plannedDate ?? addDays(dueDate, -1);
-
-  return {
-    plan,
-    reserved,
-    unassigned: Math.max(0, projectedDue - reserved),
-    cajitaShort: Math.max(0, plan.fromCajita - balances.cajita),
-    cashShort: Math.max(0, plan.fromCash - balances.efectivo),
-    plannedDate,
-    daysUntilPayment: Math.max(0, daysBetween(today, plannedDate)),
-  };
+  return { plannedDate, daysUntilPayment: Math.max(0, daysBetween(today, plannedDate)) };
 }
 
 export function buildDashboard(data: AppData, today: IsoDate): Dashboard {
@@ -140,10 +113,6 @@ export function buildDashboard(data: AppData, today: IsoDate): Dashboard {
   const upcomingCharges = pending
     .filter((charge) => getCutForDate(charge.date, settings) <= periodCut)
     .sort((a, b) => a.date.localeCompare(b.date));
-  const expectedThisPeriod = upcomingCharges.reduce(
-    (total, charge) => total + charge.amount,
-    0,
-  );
 
   const card = getCardStatus(movements, statements, settings, today);
 
@@ -156,13 +125,7 @@ export function buildDashboard(data: AppData, today: IsoDate): Dashboard {
       : 0;
 
   const projectedDue = card.remaining + expectedInThisCut;
-  const plan = buildPlanView(
-    data.paymentPlan,
-    balances,
-    projectedDue,
-    card.dueDate,
-    today,
-  );
+  const plan = buildPlanView(data.paymentPlan, card.dueDate, today);
   const estimatedYield = estimateYield(
     balances.cajita,
     settings.annualYieldRate,
@@ -177,7 +140,6 @@ export function buildDashboard(data: AppData, today: IsoDate): Dashboard {
     debt,
     free,
     toCoverDebt,
-    expectedThisPeriod,
     upcomingCharges,
     creditLeft: settings.cardLimit - debt,
     card,
@@ -192,7 +154,6 @@ export function buildDashboard(data: AppData, today: IsoDate): Dashboard {
       period.end,
       today,
     ),
-    intervalReminders: getIntervalReminders(data.fixedExpenses, today),
   };
 }
 
@@ -205,9 +166,8 @@ export interface CategoryShare {
 
 export interface PeriodSummary {
   period: Period;
-  /** Everything the period cost, including what mom paid. */
+  /** Everything the period cost. */
   totalSpent: Cents;
-  paidByMom: Cents;
   income: Cents;
   expenseCount: number;
   categories: CategoryShare[];
@@ -234,20 +194,16 @@ export function buildPeriodSummary(data: AppData, today: IsoDate): PeriodSummary
   const spending = inPeriod.filter(isSpending);
   const byCategory = new Map<string, Cents>();
   let totalSpent = 0;
-  let paidByMom = 0;
 
   for (const movement of spending) {
     const category = movement.category ?? "otros";
     byCategory.set(category, (byCategory.get(category) ?? 0) + movement.amount);
     totalSpent += movement.amount;
-    // It counts toward what the category cost, but it never left the user's money.
-    if (movement.from === "mama") paidByMom += movement.amount;
   }
 
   return {
     period,
     totalSpent,
-    paidByMom,
     income: inPeriod
       .filter((movement) => movement.type === "income")
       .reduce((total, movement) => total + movement.amount, 0),

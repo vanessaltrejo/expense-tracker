@@ -14,14 +14,12 @@ import { formatPeriodRange, getPeriodForDate, isInPeriod } from "./periods.ts";
 import { APP_PROFILES, getProfileById } from "./appProfiles.ts";
 import { getInitials } from "./profile.ts";
 import {
-  buildPaymentMovements,
-  buildYieldAdjustment,
   getLedgerBalances,
   isMomDebtEntry,
   OPENING_BALANCE_CATEGORY,
 } from "./ledger.ts";
 import { parseMoneyInput, pesos } from "./money.ts";
-import { generateExpectedCharges, getIntervalReminders } from "./recurring.ts";
+import { generateExpectedCharges } from "./recurring.ts";
 import type {
   AppData,
   FixedExpense,
@@ -36,7 +34,6 @@ const settings: Settings = {
   cutDay: 22,
   dueDay: 1,
   annualYieldRate: 0.13,
-  paydayDays: [14, 29],
   expenseCategories: [],
   incomeCategories: [],
 };
@@ -63,10 +60,6 @@ function opening(pocket: MovementEndpoint, amount: number, date = "2026-11-01"):
     to: isDebt ? null : pocket,
     category: OPENING_BALANCE_CATEGORY,
   });
-}
-
-function fromDrafts(drafts: MovementDraft[]): Movement[] {
-  return drafts.map((draft, index) => ({ ...draft, id: `d${index}` }));
 }
 
 const fixedExpenses: FixedExpense[] = [
@@ -110,16 +103,6 @@ const fixedExpenses: FixedExpense[] = [
     endDate: null,
     active: true,
   },
-  {
-    id: "nails",
-    name: "Uñas",
-    normalAmount: pesos(555),
-    schedule: { kind: "everyNDays", days: 21, lastDate: "2026-11-01" },
-    category: "otros",
-    startDate: "2026-07-01",
-    endDate: null,
-    active: true,
-  },
 ];
 
 /** Most tests use a 0% cajita so balances are plain sums; the yield tests pass 0.13. */
@@ -131,7 +114,7 @@ function appData(movements: Movement[], today = "2026-11-03", cajitaRate = 0): A
     statements: [],
     shortcuts: [],
     settings: { ...settings, annualYieldRate: cajitaRate },
-    paymentPlan: { fromCajita: 0, fromCash: 0, momGift: 0, plannedDate: null },
+    paymentPlan: { plannedDate: null },
   };
 }
 
@@ -248,20 +231,6 @@ describe("balances", () => {
     assert.equal(balances.cajita, pesos(1_100));
   });
 
-  test("a sale paid by mom moves nothing but still counts in the summary", () => {
-    const movements = [
-      opening("cajita", 1_000),
-      row({ date: "2026-11-02", type: "expense", amount: pesos(555), from: "mama", category: "otros" }),
-    ];
-    const dashboard = buildDashboard(appData(movements), "2026-11-03");
-    const summary = buildPeriodSummary(appData(movements), "2026-11-03");
-
-    assert.equal(dashboard.free, pesos(1_000));
-    assert.equal(summary.categories[0].amount, pesos(555));
-    assert.equal(summary.totalSpent, pesos(555));
-    assert.equal(summary.paidByMom, pesos(555));
-  });
-
   test("rows before an opening balance still count in their period's summary", () => {
     const movements = [
       opening("cajita", 1_000),
@@ -289,15 +258,6 @@ describe("balances", () => {
     assert.equal(dashboard.free, pesos(8_100));
     assert.equal(dashboard.toCoverDebt, 0);
     assert.equal(dashboard.creditLeft, pesos(37_000));
-  });
-
-  test("a reserved plan does not lower free money twice", () => {
-    const data = appData([opening("cajita", 1_000), opening("tarjetaNu", 600)]);
-    const withPlan: AppData = {
-      ...data,
-      paymentPlan: { fromCajita: pesos(100), fromCash: pesos(500), momGift: 0, plannedDate: null },
-    };
-    assert.equal(buildDashboard(withPlan, "2026-11-03").free, pesos(400));
   });
 });
 
@@ -379,22 +339,25 @@ describe("history filters", () => {
 });
 
 describe("card payments", () => {
-  test("800 in cash plus a 200 gift lowers the debt by 1,000", () => {
+  test("paying with cash is a transfer to the card and lowers the debt", () => {
     const movements = [
       opening("efectivo", 800),
       opening("tarjetaNu", 1_500),
-      ...fromDrafts(
-        buildPaymentMovements({
-          date: "2026-11-02",
-          fromCajita: 0,
-          fromCash: pesos(800),
-          momGift: pesos(200),
-        }),
-      ),
+      row({ date: "2026-11-02", type: "transfer", amount: pesos(800), from: "efectivo", to: "tarjetaNu" }),
     ];
     const balances = getLedgerBalances(movements, "2026-11-03");
     assert.equal(balances.efectivo, 0);
-    assert.equal(-balances.tarjetaNu, pesos(500));
+    assert.equal(-balances.tarjetaNu, pesos(700));
+  });
+
+  test("extra money from mom is an income in Banorte and leaves Deuda mami alone", () => {
+    const movements = [
+      opening("banorte", 0),
+      row({ date: "2026-11-02", type: "income", amount: pesos(2_000), to: "banorte", category: "mamá" }),
+    ];
+    const balances = getLedgerBalances(movements, "2026-11-03");
+    assert.equal(balances.banorte, pesos(2_000));
+    assert.equal(balances.porCobrarMama, 0);
   });
 
   test("100 one day and 200 the next pay a 300 statement in full", () => {
@@ -456,7 +419,6 @@ describe("card payments", () => {
 describe("expected charges", () => {
   test("only charges up to the next cut show: Spotify and Claude Pro, not iCloud on the 27th", () => {
     const dashboard = buildDashboard(appData([opening("cajita", 10_000)]), "2026-11-03");
-    assert.equal(dashboard.expectedThisPeriod, pesos(474));
     assert.deepEqual(
       dashboard.upcomingCharges.map((charge) => charge.name),
       ["Spotify Premium", "Claude Pro"],
@@ -487,7 +449,10 @@ describe("expected charges", () => {
         charge.id === "claude:2026-11-18" ? { ...charge, status: "skipped" } : charge,
       ),
     };
-    assert.equal(buildDashboard(skipped, "2026-11-03").expectedThisPeriod, pesos(74));
+    assert.deepEqual(
+      buildDashboard(skipped, "2026-11-03").upcomingCharges.map((charge) => charge.name),
+      ["Spotify Premium"],
+    );
   });
 
   test("after the cut, the next period's charges appear, including iCloud", () => {
@@ -509,14 +474,6 @@ describe("expected charges", () => {
     assert.ok(!ids.some((id) => id.startsWith("spotify")));
     assert.ok(!ids.some((id) => id.startsWith("parallels")));
     assert.ok(generateExpectedCharges(fixedExpenses, [], "2027-05-01").some((c) => c.id === "parallels:2027-05-26"));
-  });
-
-  test("nails come due on Nov 22, three weeks after Nov 1", () => {
-    const [before] = getIntervalReminders(fixedExpenses, "2026-11-21");
-    const [after] = getIntervalReminders(fixedExpenses, "2026-11-22");
-    assert.equal(before.isDue, false);
-    assert.equal(after.isDue, true);
-    assert.equal(after.dueDate, "2026-11-22");
   });
 });
 
@@ -574,15 +531,5 @@ describe("yield", () => {
       dashboard.estimatedYield,
       estimateYield(dashboard.balances.cajita, 0.13, 10),
     );
-  });
-
-  test("a balance check stores the difference as yield", () => {
-    const up = buildYieldAdjustment(pesos(1_000), pesos(1_005), "2026-11-03");
-    assert.equal(up?.to, "cajita");
-    assert.equal(up?.amount, pesos(5));
-
-    const down = buildYieldAdjustment(pesos(1_000), pesos(998), "2026-11-03");
-    assert.equal(down?.from, "cajita");
-    assert.equal(buildYieldAdjustment(pesos(10), pesos(10), "2026-11-03"), null);
   });
 });

@@ -3,75 +3,54 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 
+import { ENDPOINT_LABELS } from "@/domain/ledger";
 import { formatMoney, parseMoneyInput } from "@/domain/money";
-import { registerPayment } from "@/services/financeService";
+import { addMovement } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
 import { AmountField } from "../ui/AmountField";
 
+/** The card is always paid from the cajita, so the only thing to say is how much. */
 export function PaymentForm() {
-  const { data, dashboard, today, runAction } = useFinance();
+  const { dashboard, today, runAction } = useFinance();
   const router = useRouter();
-  const [cajitaText, setCajitaText] = useState("");
-  const [cashText, setCashText] = useState("");
-  const [giftText, setGiftText] = useState("");
-  const [date, setDate] = useState(today);
+  const [amountText, setAmountText] = useState("");
 
-  const fromCajita = cajitaText ? parseMoneyInput(cajitaText) : 0;
-  const fromCash = cashText ? parseMoneyInput(cashText) : 0;
-  const momGift = giftText ? parseMoneyInput(giftText) : 0;
-
-  const isValid = fromCajita !== null && fromCash !== null && momGift !== null;
-  const total = isValid ? fromCajita + fromCash + momGift : 0;
+  const amount = parseMoneyInput(amountText);
+  const canSubmit = amount !== null && amount > 0;
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (!isValid || total === 0 || !date) return;
+    if (!canSubmit || amount === null) return;
 
-    void runAction(`Pago de ${formatMoney(total)} registrado`, () =>
-      registerPayment({ date, fromCajita, fromCash, momGift }, data.paymentPlan),
+    void runAction(`Pago de ${formatMoney(amount)} registrado`, () =>
+      addMovement({
+        date: today,
+        type: "transfer",
+        amount,
+        from: "cajita",
+        to: "tarjetaNu",
+        category: null,
+        note: "Pago de tarjeta",
+        dataKind: "real",
+      }),
     );
     router.push("/");
   };
 
   return (
     <form onSubmit={handleSubmit} className="card gap-4">
+      <AmountField
+        label="Monto"
+        value={amountText}
+        onChange={setAmountText}
+        size="large"
+        hint={`Debes ${formatMoney(dashboard.debt)} en la tarjeta.`}
+      />
       <p className="amount text-sm text-ink-soft">
-        Debes {formatMoney(dashboard.debt)} en total. Puedes pagar en varias partes.
+        Sale de tu {ENDPOINT_LABELS.cajita}, donde tienes {formatMoney(dashboard.balances.cajita)}.
       </p>
-      <AmountField
-        label="De la cajita"
-        value={cajitaText}
-        onChange={setCajitaText}
-        hint={`Tienes ${formatMoney(dashboard.balances.cajita)}`}
-      />
-      <AmountField
-        label="En efectivo (se lo diste a tu mamá)"
-        value={cashText}
-        onChange={setCashText}
-        hint={`Tienes ${formatMoney(dashboard.balances.efectivo)}`}
-      />
-      <AmountField
-        label="Lo que tu mamá puso de regalo"
-        value={giftText}
-        onChange={setGiftText}
-        hint="Por ejemplo: le das 800, deposita 1,000, aquí van 200."
-      />
-      <label className="field-label">
-        Fecha
-        <input
-          className="field"
-          type="date"
-          max={today}
-          value={date}
-          onChange={(event) => setDate(event.target.value)}
-        />
-      </label>
-      <button
-        type="submit"
-        className="btn-primary amount"
-        disabled={!isValid || total === 0 || !date}
-      >
-        Registrar pago de {formatMoney(total)}
+      <button type="submit" className="btn-primary amount" disabled={!canSubmit}>
+        Pagar {canSubmit && amount !== null ? formatMoney(amount) : "tarjeta"}
       </button>
     </form>
   );

@@ -11,8 +11,8 @@ export type PocketId =
   | "porCobrarMama"
   | "tarjetaNu";
 
-/** Mom can pay for something without any of the user's pockets being involved. */
-export type MovementEndpoint = PocketId | "mama";
+/** Where money leaves from or lands in. Mom never appears: what she owes lives in Deuda mami. */
+export type MovementEndpoint = PocketId;
 
 export type MovementType =
   | "income"
@@ -41,9 +41,7 @@ export type MovementDraft = Omit<Movement, "id">;
 
 export type FixedExpenseSchedule =
   | { kind: "monthly"; dayOfMonth: number }
-  | { kind: "yearly"; month: number; dayOfMonth: number }
-  /** No fixed day: the app only reminds once `days` have passed since `lastDate`. */
-  | { kind: "everyNDays"; days: number; lastDate: IsoDate };
+  | { kind: "yearly"; month: number; dayOfMonth: number };
 
 export interface FixedExpense {
   id: string;
@@ -81,8 +79,6 @@ export interface Shortcut {
   amount: Cents | null;
   category: string;
   paidFrom: MovementEndpoint;
-  /** Links a shortcut to an interval expense, so using it restarts that reminder. */
-  fixedExpenseId: string | null;
 }
 
 export interface Settings {
@@ -91,15 +87,11 @@ export interface Settings {
   dueDay: number;
   /** Yearly rate as a fraction: 0.13 means 13%. */
   annualYieldRate: number;
-  paydayDays: number[];
   expenseCategories: string[];
   incomeCategories: string[];
 }
 
 export interface PaymentPlan {
-  fromCajita: Cents;
-  fromCash: Cents;
-  momGift: Cents;
   /** Day the user intends to pay. Null falls back to the day before the due date. */
   plannedDate: IsoDate | null;
 }

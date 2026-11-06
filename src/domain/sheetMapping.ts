@@ -51,7 +51,6 @@ const STATUS_LABELS: Record<ExpectedChargeStatus, string> = {
 const FREQUENCY_LABELS = {
   monthly: "Mensual",
   yearly: "Anual",
-  everyNDays: "Cada N días",
 } as const;
 
 function invert<K extends string>(labels: Record<K, string>): Map<string, K> {
@@ -66,8 +65,6 @@ const TYPE_BY_LABEL = invert(TYPE_LABELS);
 const DATA_KIND_BY_LABEL = invert(DATA_KIND_LABELS);
 const STATUS_BY_LABEL = invert(STATUS_LABELS);
 const ENDPOINT_BY_LABEL = invert(ENDPOINT_LABELS);
-// Earlier name of the "Deuda mami" pocket, so rows typed before the rename still read.
-ENDPOINT_BY_LABEL.set("por cobrar (mamá)", "porCobrarMama");
 const FREQUENCY_BY_LABEL = invert(FREQUENCY_LABELS);
 
 const SHEETS_EPOCH_MS = Date.UTC(1899, 11, 30);
@@ -177,11 +174,11 @@ export function movementToRow(movement: Movement): Cell[] {
   ];
 }
 
-// ---------- Gastos fijos: ID | Nombre | Monto normal | Frecuencia | Día | Mes | Cada (días) | Última vez | Categoría | Desde | Hasta | Activo
+// ---------- Gastos fijos (the app only reads): ID | Nombre | Monto normal | Frecuencia | Día | Mes | Categoría | Desde | Hasta | Activo
 
 export function parseFixedExpenseRow(row: SheetRow): Parsed<FixedExpense> {
   if (isEmptyRow(row)) return { empty: true };
-  const [id, name, amount, frequency, day, month, every, lastDate, category, start, end, active] = row;
+  const [id, name, amount, frequency, day, month, category, start, end, active] = row;
 
   const normalAmount = cellToCents(amount);
   if (!text(id) || !text(name) || normalAmount === null) {
@@ -191,22 +188,15 @@ export function parseFixedExpenseRow(row: SheetRow): Parsed<FixedExpense> {
   const startDate = cellToIsoDate(start);
   if (!kind || !startDate) return { issue: "La frecuencia o la fecha Desde no son válidas" };
 
+  const dayOfMonth = cellToInteger(day);
+  if (!dayOfMonth) return { issue: "Falta el día de cobro" };
   let schedule: FixedExpense["schedule"];
-  if (kind === "everyNDays") {
-    const days = cellToInteger(every);
-    const last = cellToIsoDate(lastDate);
-    if (!days || !last) return { issue: "Falta Cada (días) o Última vez" };
-    schedule = { kind, days, lastDate: last };
+  if (kind === "yearly") {
+    const monthNumber = cellToInteger(month);
+    if (!monthNumber) return { issue: "Falta el mes del cobro anual" };
+    schedule = { kind, month: monthNumber, dayOfMonth };
   } else {
-    const dayOfMonth = cellToInteger(day);
-    if (!dayOfMonth) return { issue: "Falta el día de cobro" };
-    if (kind === "yearly") {
-      const monthNumber = cellToInteger(month);
-      if (!monthNumber) return { issue: "Falta el mes del cobro anual" };
-      schedule = { kind, month: monthNumber, dayOfMonth };
-    } else {
-      schedule = { kind, dayOfMonth };
-    }
+    schedule = { kind, dayOfMonth };
   }
 
   return {
@@ -221,24 +211,6 @@ export function parseFixedExpenseRow(row: SheetRow): Parsed<FixedExpense> {
       active: cellToBoolean(active),
     },
   };
-}
-
-export function fixedExpenseToRow(expense: FixedExpense): Cell[] {
-  const { schedule } = expense;
-  return [
-    expense.id,
-    expense.name,
-    centsToPesos(expense.normalAmount),
-    FREQUENCY_LABELS[schedule.kind],
-    schedule.kind === "everyNDays" ? "" : schedule.dayOfMonth,
-    schedule.kind === "yearly" ? schedule.month : "",
-    schedule.kind === "everyNDays" ? schedule.days : "",
-    schedule.kind === "everyNDays" ? schedule.lastDate : "",
-    expense.category,
-    expense.startDate,
-    expense.endDate ?? "",
-    expense.active,
-  ];
 }
 
 // ---------- Pagos esperados: ID | Gasto fijo | Nombre | Fecha | Monto | Categoría | Estado
@@ -291,11 +263,11 @@ export function parseStatementRow(row: SheetRow): Parsed<StatementRecord> {
   return { value: { cutDate, dueDate, statementAmount } };
 }
 
-// ---------- Atajos: ID | Nombre | Monto | Categoría | Se paga con | Gasto fijo
+// ---------- Atajos: ID | Nombre | Monto | Categoría | Se paga con
 
 export function parseShortcutRow(row: SheetRow): Parsed<Shortcut> {
   if (isEmptyRow(row)) return { empty: true };
-  const [id, name, amount, category, paidFrom, fixedExpenseId] = row;
+  const [id, name, amount, category, paidFrom] = row;
   const endpoint = endpointFromCell(paidFrom);
   if (!text(id) || !text(name) || !endpoint) {
     return { issue: "Falta el ID, el nombre o con qué se paga" };
@@ -307,7 +279,6 @@ export function parseShortcutRow(row: SheetRow): Parsed<Shortcut> {
       amount: cellToCents(amount),
       category: text(category) || "otros",
       paidFrom: endpoint,
-      fixedExpenseId: text(fixedExpenseId) || null,
     },
   };
 }
@@ -319,11 +290,10 @@ export function shortcutToRow(shortcut: Shortcut): Cell[] {
     shortcut.amount === null ? "" : centsToPesos(shortcut.amount),
     shortcut.category,
     ENDPOINT_LABELS[shortcut.paidFrom],
-    shortcut.fixedExpenseId ?? "",
   ];
 }
 
-// ---------- Ajustes: values in B2:B12, category lists in E (gasto) and F (ingreso)
+// ---------- Ajustes: values in B2:B6, category lists in E (gasto) and F (ingreso)
 
 /** Rows of the Ajustes tab, starting at row 1 (the header). */
 export function parseSettings(
@@ -337,11 +307,6 @@ export function parseSettings(
       .map((row) => text(row[index]))
       .filter((item) => item !== "");
 
-  const paydayDays = text(value(6))
-    .split(/[,\s]+/)
-    .map(Number)
-    .filter((day) => Number.isInteger(day) && day >= 1 && day <= 31);
-
   const expenseCategories = column(4);
   const incomeCategories = column(5);
 
@@ -352,28 +317,17 @@ export function parseSettings(
       dueDay: cellToInteger(value(4)) ?? fallback.dueDay,
       annualYieldRate:
         typeof value(5) === "number" ? (value(5) as number) : fallback.annualYieldRate,
-      paydayDays: paydayDays.length > 0 ? paydayDays : fallback.paydayDays,
       expenseCategories:
         expenseCategories.length > 0 ? expenseCategories : fallback.expenseCategories,
       incomeCategories:
         incomeCategories.length > 0 ? incomeCategories : fallback.incomeCategories,
     },
-    plan: {
-      fromCajita: cellToCents(value(9)) ?? 0,
-      fromCash: cellToCents(value(10)) ?? 0,
-      momGift: cellToCents(value(11)) ?? 0,
-      plannedDate: cellToIsoDate(value(12)),
-    },
+    plan: { plannedDate: cellToIsoDate(value(6)) },
   };
 }
 
 export function paymentPlanToCells(plan: PaymentPlan): Cell[][] {
-  return [
-    [centsToPesos(plan.fromCajita)],
-    [centsToPesos(plan.fromCash)],
-    [centsToPesos(plan.momGift)],
-    [plan.plannedDate ?? ""],
-  ];
+  return [[plan.plannedDate ?? ""]];
 }
 
 /** Parses every row of a tab, collecting the rows that can't be read instead of failing. */

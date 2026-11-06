@@ -16,7 +16,7 @@ export const seedFixedExpenses: FixedExpense[] = [
   {
     id: "claude-pro",
     name: "Claude Pro",
-    normalAmount: pesos(400),
+    normalAmount: pesos(349),
     schedule: { kind: "monthly", dayOfMonth: 18 },
     category: "suscripciones",
     startDate: "2026-08-01",
@@ -63,16 +63,6 @@ export const seedFixedExpenses: FixedExpense[] = [
     endDate: null,
     active: true,
   },
-  {
-    id: "nails",
-    name: "Uñas",
-    normalAmount: pesos(555),
-    schedule: { kind: "everyNDays", days: 21, lastDate: "2026-11-01" },
-    category: "otros",
-    startDate: "2026-07-01",
-    endDate: null,
-    active: true,
-  },
 ];
 
 export const seedStatements: StatementRecord[] = [
@@ -83,11 +73,11 @@ export const seedStatements: StatementRecord[] = [
 ];
 
 export const seedShortcuts: Shortcut[] = [
-  { id: "s1", name: "Dona del Tims", amount: pesos(27), category: "antojos", paidFrom: "tarjetaNu", fixedExpenseId: null },
-  { id: "s2", name: "Dona de Krispy Kreme", amount: null, category: "antojos", paidFrom: "tarjetaNu", fixedExpenseId: null },
-  { id: "s3", name: "Chilaquiles de Super Salads", amount: pesos(99), category: "comida", paidFrom: "tarjetaNu", fixedExpenseId: null },
-  { id: "s4", name: "Pizza individual", amount: pesos(85), category: "comida", paidFrom: "tarjetaNu", fixedExpenseId: null },
-  { id: "s5", name: "Uñas", amount: pesos(555), category: "otros", paidFrom: "tarjetaNu", fixedExpenseId: "nails" },
+  { id: "s1", name: "Dona del Tims", amount: pesos(27), category: "antojos", paidFrom: "tarjetaNu" },
+  { id: "s2", name: "Dona de Krispy Kreme", amount: null, category: "antojos", paidFrom: "tarjetaNu" },
+  { id: "s3", name: "Chilaquiles de Super Salads", amount: pesos(99), category: "comida", paidFrom: "tarjetaNu" },
+  { id: "s4", name: "Pizza individual", amount: pesos(85), category: "comida", paidFrom: "tarjetaNu" },
+  { id: "s5", name: "Uñas", amount: pesos(555), category: "otros", paidFrom: "tarjetaNu" },
 ];
 
 export const seedSettings: Settings = {
@@ -95,7 +85,6 @@ export const seedSettings: Settings = {
   cutDay: 22,
   dueDay: 1,
   annualYieldRate: 0.13,
-  paydayDays: [14, 29],
   expenseCategories: [
     "comida",
     "salidas",
@@ -115,9 +104,4 @@ export const seedSettings: Settings = {
 /** Category for something to review later. The app reminds about these on Home. */
 export const PENDING_CATEGORY = "pendiente";
 
-export const emptyPaymentPlan: PaymentPlan = {
-  fromCajita: 0,
-  fromCash: 0,
-  momGift: 0,
-  plannedDate: null,
-};
+export const emptyPaymentPlan: PaymentPlan = { plannedDate: null };

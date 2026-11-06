@@ -1,7 +1,5 @@
 import {
-  addDays,
   dateInMonth,
-  daysBetween,
   getYearMonth,
   shiftMonth,
 } from "./dates.ts";
@@ -64,36 +62,4 @@ export function generateExpectedCharges(
 
 export function isOverdue(charge: ExpectedCharge, today: IsoDate): boolean {
   return charge.status === "expected" && charge.date < today;
-}
-
-export interface IntervalReminder {
-  expense: FixedExpense;
-  lastDate: IsoDate;
-  dueDate: IsoDate;
-  daysSinceLast: number;
-  isDue: boolean;
-}
-
-/** Reminders for expenses with no fixed day, such as nails every 3 weeks. */
-export function getIntervalReminders(
-  expenses: FixedExpense[],
-  today: IsoDate,
-): IntervalReminder[] {
-  const reminders: IntervalReminder[] = [];
-
-  for (const expense of expenses) {
-    if (!expense.active || expense.schedule.kind !== "everyNDays") continue;
-
-    const { days, lastDate } = expense.schedule;
-    const dueDate = addDays(lastDate, days);
-    reminders.push({
-      expense,
-      lastDate,
-      dueDate,
-      daysSinceLast: daysBetween(lastDate, today),
-      isDue: today >= dueDate,
-    });
-  }
-
-  return reminders;
 }

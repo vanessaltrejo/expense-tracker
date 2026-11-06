@@ -3,7 +3,6 @@ import { createId } from "@/domain/ids";
 import {
   type Cell,
   expectedChargeToRow,
-  fixedExpenseToRow,
   movementToRow,
   parseExpectedChargeRow,
   parseFixedExpenseRow,
@@ -33,10 +32,10 @@ type TabName = (typeof TAB)[keyof typeof TAB];
 
 const LAST_COLUMN: Record<TabName, string> = {
   Movimientos: "I",
-  "Gastos fijos": "L",
+  "Gastos fijos": "J",
   "Pagos esperados": "G",
   Cortes: "C",
-  Atajos: "F",
+  Atajos: "E",
   Ajustes: "K",
 };
 
@@ -54,10 +53,10 @@ export async function readSnapshot(client: SheetsClient): Promise<SheetSnapshot>
   const [movementRows, fixedRows, expectedRows, statementRows, shortcutRows, settingsRows] =
     await client.batchGet([
       `${quote(TAB.movements)}!A2:I`,
-      `${quote(TAB.fixedExpenses)}!A2:L`,
+      `${quote(TAB.fixedExpenses)}!A2:J`,
       `${quote(TAB.expectedCharges)}!A2:G`,
       `${quote(TAB.statements)}!A2:C`,
-      `${quote(TAB.shortcuts)}!A2:F`,
+      `${quote(TAB.shortcuts)}!A2:E`,
       `${quote(TAB.settings)}!A1:F40`,
     ]);
 
@@ -203,11 +202,6 @@ export async function applyOps(client: SheetsClient, ops: SyncOp[]): Promise<voi
           op.charges.map((charge) => ({ id: charge.id, row: expectedChargeToRow(charge) })),
         );
         break;
-      case "upsertFixedExpense":
-        await upsertRows(client, TAB.fixedExpenses, [
-          { id: op.expense.id, row: fixedExpenseToRow(op.expense) },
-        ]);
-        break;
       case "upsertShortcut":
         await upsertRows(client, TAB.shortcuts, [
           { id: op.shortcut.id, row: shortcutToRow(op.shortcut) },
@@ -218,7 +212,7 @@ export async function applyOps(client: SheetsClient, ops: SyncOp[]): Promise<voi
         break;
       case "savePaymentPlan":
         await client.updateValues([
-          { range: `${quote(TAB.settings)}!B9:B12`, values: paymentPlanToCells(op.plan) },
+          { range: `${quote(TAB.settings)}!B6`, values: paymentPlanToCells(op.plan) },
         ]);
         break;
     }

@@ -11,13 +11,13 @@ import { useFinance } from "../FinanceProvider";
 import { AmountField } from "../ui/AmountField";
 import { formatCategory, getCategoryIcon } from "../ui/styles";
 
-export type MovementFormKind = "expense" | "income" | "transfer";
+export type MovementFormKind = "expense" | "income";
 
 /** The card goes first because almost every expense is paid with it. */
-const EXPENSE_SOURCES: MovementEndpoint[] = ["tarjetaNu", "efectivo", "cajita", "banorte", "mama"];
+const EXPENSE_SOURCES: MovementEndpoint[] = ["tarjetaNu", "efectivo", "cajita", "banorte"];
+/** What her mom sends always lands in Banorte, so that income never asks where it went. */
+const MOM_INCOME_CATEGORY = "mamá";
 const INCOME_TARGETS: PocketId[] = ["banorte", "efectivo"];
-const TRANSFER_POCKETS: PocketId[] = ["banorte", "cajita", "efectivo", "porCobrarMama"];
-
 function PocketSelect<T extends MovementEndpoint>({
   label,
   value,
@@ -51,7 +51,7 @@ function PocketSelect<T extends MovementEndpoint>({
 }
 
 export function MovementForm({ kind }: { kind: MovementFormKind }) {
-  const { data, dashboard, today, runAction } = useFinance();
+  const { data, today, runAction } = useFinance();
   const router = useRouter();
 
   const [amountText, setAmountText] = useState("");
@@ -61,23 +61,17 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
   const [keepAsShortcut, setKeepAsShortcut] = useState(false);
   const [expenseFrom, setExpenseFrom] = useState<MovementEndpoint>("tarjetaNu");
   const [incomeTo, setIncomeTo] = useState<PocketId>("banorte");
-  const [transferFrom, setTransferFrom] = useState<PocketId>("banorte");
-  const [transferTo, setTransferTo] = useState<PocketId>("cajita");
 
   const amount = parseMoneyInput(amountText);
-  const needsCategory = kind !== "transfer";
-  const samePocket = kind === "transfer" && transferFrom === transferTo;
+  const isFromMom = kind === "income" && category === MOM_INCOME_CATEGORY;
   const canSubmit =
     amount !== null &&
     amount > 0 &&
     Boolean(date) &&
-    !samePocket &&
-    (!needsCategory || category !== null);
+    category !== null;
 
   const categories =
-    kind === "income"
-      ? data.settings.incomeCategories
-      : data.settings.expenseCategories;
+    kind === "income" ? data.settings.incomeCategories : data.settings.expenseCategories;
 
   const buildDraft = (validAmount: number): MovementDraft => {
     const base = {
@@ -97,15 +91,7 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
           to: null,
         };
       case "income":
-        return { ...base, type: "income", from: null, to: incomeTo };
-      case "transfer":
-        return {
-          ...base,
-          type: "transfer",
-          from: transferFrom,
-          to: transferTo,
-          category: null,
-        };
+        return { ...base, type: "income", from: null, to: isFromMom ? "banorte" : incomeTo };
     }
   };
 
@@ -122,7 +108,6 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
           amount,
           category,
           paidFrom: shortcutSource,
-          fixedExpenseId: null,
         });
       }
       return addMovement(draft);
@@ -137,7 +122,7 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
       <AmountField label="Monto" value={amountText} onChange={setAmountText} size="large" />
 
       <label className="field-label">
-        {kind === "transfer" ? "Nota (opcional)" : "¿En qué fue?"}
+        ¿En qué fue?
         <input
           className="field"
           type="text"
@@ -145,9 +130,7 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
           value={note}
           onChange={(event) => setNote(event.target.value)}
         />
-        {kind !== "transfer" ? (
-          <span className="text-xs font-normal">Así se verá en tu historial.</span>
-        ) : null}
+        <span className="text-xs font-normal">Así se verá en tu historial.</span>
       </label>
 
       {kind === "expense" ? (
@@ -159,7 +142,7 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
         />
       ) : null}
 
-      {kind === "income" ? (
+      {kind === "income" && !isFromMom ? (
         <PocketSelect
           label="¿A dónde cayó?"
           value={incomeTo}
@@ -168,49 +151,23 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
         />
       ) : null}
 
-      {kind === "transfer" ? (
-        <>
-          <div className="grid grid-cols-2 gap-2">
-            <PocketSelect
-              label="De"
-              value={transferFrom}
-              options={TRANSFER_POCKETS}
-              onChange={setTransferFrom}
-            />
-            <PocketSelect
-              label="A"
-              value={transferTo}
-              options={TRANSFER_POCKETS}
-              onChange={setTransferTo}
-            />
-          </div>
-          <p className="amount text-sm text-ink-soft">
-            {samePocket
-              ? "Elige dos bolsas distintas."
-              : `En ${ENDPOINT_LABELS[transferFrom]} hay ${formatMoney(dashboard.balances[transferFrom])}.`}
-          </p>
-        </>
-      ) : null}
-
-      {needsCategory ? (
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1.5 text-sm font-medium text-ink-soft">Categoría</legend>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((option) => (
-              <button
-                key={option}
-                type="button"
-                aria-pressed={category === option}
-                className="chip"
-                onClick={() => setCategory(option)}
-              >
-                <span aria-hidden="true">{getCategoryIcon(option)}</span>
-                <span>{formatCategory(option)}</span>
-              </button>
-            ))}
-          </div>
-        </fieldset>
-      ) : null}
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1.5 text-sm font-medium text-ink-soft">Categoría</legend>
+        <div className="flex flex-wrap gap-2">
+          {categories.map((option) => (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={category === option}
+              className="chip"
+              onClick={() => setCategory(option)}
+            >
+              <span aria-hidden="true">{getCategoryIcon(option)}</span>
+              <span>{formatCategory(option)}</span>
+            </button>
+          ))}
+        </div>
+      </fieldset>
 
       <label className="field-label">
         Fecha

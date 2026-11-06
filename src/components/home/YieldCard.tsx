@@ -19,7 +19,8 @@ export function YieldCard() {
           +{formatMoney(dashboard.estimatedYield)}
         </p>
         <p className="amount mt-1 text-sm text-ink-soft">
-          Llegarías con {formatMoney(dashboard.cajitaOnPaymentDay)} a la cajita.
+          Hoy tienes {formatMoney(balances.cajita)} en la cajita. Para el{" "}
+          {formatShortDate(plan.plannedDate)} tendrías {formatMoney(dashboard.cajitaOnPaymentDay)}.
           Interés compuesto diario al {Math.round(data.settings.annualYieldRate * 100)}% anual.
         </p>
       </div>
@@ -35,7 +36,7 @@ export function YieldCard() {
           onChange={(event) => {
             const plannedDate = event.target.value || null;
             void runAction("Día de pago actualizado", () =>
-              savePaymentPlan({ ...data.paymentPlan, plannedDate }),
+              savePaymentPlan({ plannedDate }),
             );
           }}
         />

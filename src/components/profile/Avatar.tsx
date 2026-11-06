@@ -16,12 +16,29 @@ export function Avatar({
   initials,
   tone = "violet",
   size = 72,
+  fluid = false,
 }: {
   name: string;
   initials?: string;
   tone?: AvatarTone;
   size?: number;
+  /** Fills the width it is given (up to `size`) instead of a fixed size, so a row never wraps. */
+  fluid?: boolean;
 }) {
+  if (fluid) {
+    return (
+      <span className="@container mx-auto block w-full" style={{ maxWidth: size }}>
+        <span
+          role="img"
+          aria-label={`Perfil de ${name}`}
+          className={`flex aspect-square w-full items-center justify-center rounded-full bg-linear-135 font-semibold text-white text-[38cqw] ${TONES[tone]}`}
+        >
+          {initials ?? getInitials(name)}
+        </span>
+      </span>
+    );
+  }
+
   return (
     <span
       role="img"

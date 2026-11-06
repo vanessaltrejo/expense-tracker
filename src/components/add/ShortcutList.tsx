@@ -26,7 +26,7 @@ function ShortcutEditor({
   editing: Editing;
   onClose: () => void;
 }) {
-  const { data, today, runAction } = useFinance();
+  const { today, runAction } = useFinance();
   const router = useRouter();
   const { shortcut, mode } = editing;
   const [name, setName] = useState(shortcut.name);
@@ -43,7 +43,7 @@ function ShortcutEditor({
 
     if (mode === "price") {
       void runAction(`${shortcut.name}, ${formatMoney(amount)}`, () =>
-        logShortcutWithPrice(shortcut, amount, data.fixedExpenses, today),
+        logShortcutWithPrice(shortcut, amount, today),
       );
       router.push("/");
       return;
@@ -112,7 +112,7 @@ export function ShortcutList() {
       return;
     }
     void runAction(`${shortcut.name}, ${formatMoney(shortcut.amount)}`, () =>
-      logShortcut(shortcut, data.fixedExpenses, today),
+      logShortcut(shortcut, today),
     );
     router.push("/");
   };

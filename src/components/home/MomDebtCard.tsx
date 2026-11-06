@@ -21,29 +21,30 @@ type Source = PocketId | "registered";
 const PAID_WITH: { id: Source; label: string }[] = [
   { id: "tarjetaNu", label: "Tarjeta" },
   { id: "efectivo", label: "Efectivo" },
-  { id: "cajita", label: "Cajita" },
   { id: "registered", label: "Ya está registrado" },
 ];
 
 const SOURCE_HELP: Record<Source, string> = {
-  tarjetaNu: "Sube tu deuda de la tarjeta y Deuda mami por lo mismo.",
-  efectivo: "Sale de tu efectivo y pasa a Deuda mami.",
-  cajita: "Sale de tu cajita y pasa a Deuda mami.",
-  banorte: "Sale de Banorte y pasa a Deuda mami.",
+  tarjetaNu: "Lo pagaste con tu tarjeta: sube tu deuda de la tarjeta y Deuda mami por lo mismo.",
+  efectivo: "Tu mamá te quitó efectivo: baja tu efectivo y sube Deuda mami.",
+  cajita: "",
+  banorte: "",
   porCobrarMama: "",
   registered:
     "Para algo que ya está en tu historial o en tu deuda inicial: solo sube Deuda mami, sin contarlo dos veces.",
 };
 
-/** Banorte first: that is where her mom's deposits land, then it goes to the cajita. */
+/** She gives it back either in cash or by depositing it in Banorte. */
 const RECEIVED_IN: { id: PocketId; label: string }[] = [
   { id: "banorte", label: "Banorte" },
   { id: "efectivo", label: "Efectivo" },
-  { id: "cajita", label: "Cajita" },
 ];
 
-const RECEIVED_HELP =
-  "Normalmente cae en Banorte: de ahí lo pasas a la cajita y, el día que toque, pagas la tarjeta.";
+const RECEIVED_HELP: Partial<Record<Source, string>> = {
+  banorte:
+    "Te lo depositó en Banorte: de ahí lo pasas a la cajita y, el día que toque, pagas la tarjeta.",
+  efectivo: "Te lo dio en efectivo: sube tu efectivo.",
+};
 
 function describe(movement: Movement): string {
   if (movement.note && movement.note !== "Saldo inicial") return movement.note;
@@ -122,8 +123,6 @@ export function MomDebtCard() {
     );
   };
 
-  const options: { id: Source; label: string }[] = mode === "repayment" ? RECEIVED_IN : PAID_WITH;
-
   return (
     <section className={`card ${POCKET_STYLES[MOM].soft}`}>
       <div className="flex items-baseline justify-between gap-3">
@@ -182,10 +181,10 @@ export function MomDebtCard() {
           </label>
           <fieldset>
             <legend className="mb-1.5 text-sm font-medium text-ink-soft">
-              {mode === "newDebt" ? "¿Con qué lo pagaste?" : "¿A dónde lo metiste?"}
+              {mode === "newDebt" ? "¿Cómo fue?" : "¿Cómo te lo regresó?"}
             </legend>
             <div className="flex flex-wrap gap-2">
-              {options.map((option) => (
+              {(mode === "newDebt" ? PAID_WITH : RECEIVED_IN).map((option) => (
                 <button
                   key={option.id}
                   type="button"
@@ -198,7 +197,7 @@ export function MomDebtCard() {
               ))}
             </div>
             <p className="mt-2 text-xs text-ink-soft">
-              {mode === "newDebt" ? SOURCE_HELP[pocket] : RECEIVED_HELP}
+              {mode === "newDebt" ? SOURCE_HELP[pocket] : RECEIVED_HELP[pocket]}
             </p>
           </fieldset>
           <div className="grid grid-cols-2 gap-2">

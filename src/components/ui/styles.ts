@@ -10,7 +10,6 @@ export const POCKET_STYLES: Record<
   efectivo: { text: "text-efectivo", soft: "bg-efectivo-soft", bar: "bg-efectivo" },
   porCobrarMama: { text: "text-cobrar", soft: "bg-cobrar-soft", bar: "bg-cobrar" },
   tarjetaNu: { text: "text-tarjeta", soft: "bg-tarjeta-soft", bar: "bg-tarjeta" },
-  mama: { text: "text-cobrar", soft: "bg-cobrar-soft", bar: "bg-cobrar" },
 };
 
 const CATEGORY_ICONS: Record<string, string> = {

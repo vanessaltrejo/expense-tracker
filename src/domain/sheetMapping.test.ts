@@ -5,7 +5,6 @@ import {
   cellToCents,
   cellToIsoDate,
   expectedChargeToRow,
-  fixedExpenseToRow,
   movementToRow,
   parseExpectedChargeRow,
   parseFixedExpenseRow,
@@ -16,14 +15,13 @@ import {
   shortcutToRow,
 } from "./sheetMapping.ts";
 import { parseSyncOps } from "./syncOps.ts";
-import type { FixedExpense, Movement, Settings } from "./types.ts";
+import type { Movement, Settings } from "./types.ts";
 
 const fallback: Settings = {
   cardLimit: 4_000_000,
   cutDay: 22,
   dueDay: 1,
   annualYieldRate: 0.13,
-  paydayDays: [14, 29],
   expenseCategories: ["comida"],
   incomeCategories: ["horno³"],
 };
@@ -59,25 +57,17 @@ describe("Movimientos rows", () => {
 
   test("a row written by the app reads back the same", () => {
     const row = movementToRow(movement);
-    assert.deepEqual(row, ["H22", "2026-10-31", "Gasto con tarjeta", 1307.06, "Tarjeta Nu", "", "salidas", "Salida Panorama", "Dummy"]);
+    assert.deepEqual(row, ["H22", "2026-10-31", "Gasto con tarjeta", 1307.06, "Tarjeta Nu crédito", "", "salidas", "Salida Panorama", "Dummy"]);
     const parsed = parseMovementRow(row);
     assert.ok("value" in parsed);
     assert.deepEqual(parsed.value, movement);
   });
 
   test("a row edited by hand with a wrong type or amount is flagged, not counted", () => {
-    const badType = parseMovementRow(["H1", 46331, "Compra", 10, "Tarjeta Nu", "", "", "", "Real"]);
+    const badType = parseMovementRow(["H1", 46331, "Compra", 10, "Tarjeta Nu crédito", "", "", "", "Real"]);
     assert.ok("issue" in badType);
     const badAmount = parseMovementRow(["H1", 46331, "Gasto", "diez", "Efectivo", "", "", "", "Real"]);
     assert.ok("issue" in badAmount);
-  });
-
-  test("rows written before the Deuda mami rename still read as the same pocket", () => {
-    const oldName = parseMovementRow(["4", 46331, "Ajuste", 5000, "", "Por cobrar (mamá)", "Saldo inicial", "", "Real"]);
-    const newName = parseMovementRow(["4", 46331, "Ajuste", 5000, "", "Deuda mami", "Saldo inicial", "", "Real"]);
-    assert.ok("value" in oldName && "value" in newName);
-    assert.equal(oldName.value.to, "porCobrarMama");
-    assert.equal(newName.value.to, "porCobrarMama");
   });
 
   test("an empty Dato means Real, and an empty ID is kept for the app to fill", () => {
@@ -112,17 +102,16 @@ describe("Movimientos rows", () => {
 });
 
 describe("other tabs", () => {
-  test("fixed expenses round-trip for each kind of schedule", () => {
-    const expenses: FixedExpense[] = [
-      { id: "spotify", name: "Spotify Premium", normalAmount: 7_400, schedule: { kind: "monthly", dayOfMonth: 5 }, category: "suscripciones", startDate: "2026-09-01", endDate: null, active: true },
-      { id: "parallels", name: "Parallels", normalAmount: 199_900, schedule: { kind: "yearly", month: 5, dayOfMonth: 26 }, category: "suscripciones", startDate: "2026-05-26", endDate: null, active: true },
-      { id: "nails", name: "Uñas", normalAmount: 55_500, schedule: { kind: "everyNDays", days: 21, lastDate: "2026-11-01" }, category: "otros", startDate: "2026-07-01", endDate: "2027-01-01", active: false },
-    ];
-    for (const expense of expenses) {
-      const parsed = parseFixedExpenseRow(fixedExpenseToRow(expense));
-      assert.ok("value" in parsed);
-      assert.deepEqual(parsed.value, expense);
-    }
+  test("fixed expenses read as monthly or yearly, and a bad one is reported", () => {
+    const monthly = parseFixedExpenseRow(["spotify", "Spotify Premium", 74, "Mensual", 5, "", "suscripciones", 46266, "", true]);
+    assert.ok("value" in monthly);
+    assert.deepEqual(monthly.value, { id: "spotify", name: "Spotify Premium", normalAmount: 7_400, schedule: { kind: "monthly", dayOfMonth: 5 }, category: "suscripciones", startDate: "2026-09-01", endDate: null, active: true });
+
+    const yearly = parseFixedExpenseRow(["parallels", "Parallels", 1999, "Anual", 26, 5, "suscripciones", 46168, "", true]);
+    assert.ok("value" in yearly);
+    assert.deepEqual(yearly.value.schedule, { kind: "yearly", month: 5, dayOfMonth: 26 });
+
+    assert.ok("issue" in parseFixedExpenseRow(["x", "Algo", 10, "Cada N días", "", "", "otros", 46266, "", true]));
   });
 
   test("expected charges and shortcuts round-trip, and a shortcut can have no price", () => {
@@ -131,33 +120,26 @@ describe("other tabs", () => {
     assert.ok("value" in parsedCharge);
     assert.deepEqual(parsedCharge.value, charge);
 
-    const shortcut = { id: "s2", name: "Dona de Krispy Kreme", amount: null, category: "antojos", paidFrom: "tarjetaNu" as const, fixedExpenseId: null };
+    const shortcut = { id: "s2", name: "Dona de Krispy Kreme", amount: null, category: "antojos", paidFrom: "tarjetaNu" as const };
     const parsedShortcut = parseShortcutRow(shortcutToRow(shortcut));
     assert.ok("value" in parsedShortcut);
     assert.deepEqual(parsedShortcut.value, shortcut);
   });
 
-  test("Ajustes gives the settings, the category lists and the payment plan", () => {
+  test("Ajustes gives the settings, the category lists and the payment day", () => {
     const rows = [
       ["Ajuste", "Valor", "Nota", null, "Categorías", "Categorías de ingreso"],
       ["Límite de la tarjeta", 40000, "", null, "comida", "horno³"],
       ["Día de corte", 22, "", null, "pendiente", "comedor"],
       ["Día límite de pago", 1],
       ["Tasa anual de la cajita", 0.13],
-      ["Días de quincena", "14, 29"],
-      ["Aviso de cobros", 3],
-      ["Aviso de pago", 2],
-      ["Plan: de la cajita", 100],
-      ["Plan: en efectivo", 500],
-      ["Plan: regalo de mamá", 0],
-      ["Plan: día de pago", 46355],
+      ["Día de pago", 46355],
     ];
     const { settings, plan } = parseSettings(rows, fallback);
     assert.equal(settings.cardLimit, 4_000_000);
-    assert.deepEqual(settings.paydayDays, [14, 29]);
     assert.deepEqual(settings.expenseCategories, ["comida", "pendiente"]);
     assert.deepEqual(settings.incomeCategories, ["horno³", "comedor"]);
-    assert.deepEqual(plan, { fromCajita: 10_000, fromCash: 50_000, momGift: 0, plannedDate: "2026-11-29" });
+    assert.deepEqual(plan, { plannedDate: "2026-11-29" });
   });
 });
 

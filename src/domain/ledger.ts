@@ -3,7 +3,6 @@ import type {
   Cents,
   IsoDate,
   Movement,
-  MovementDraft,
   MovementEndpoint,
   PocketId,
 } from "./types.ts";
@@ -12,16 +11,15 @@ export const OPENING_BALANCE_CATEGORY = "Saldo inicial";
 export const YIELD_CATEGORY = "Rendimiento";
 
 export const ENDPOINT_LABELS: Record<MovementEndpoint, string> = {
-  cajita: "Cajita Turbo",
+  cajita: "Cajita Nu Débito",
   banorte: "Banorte",
   efectivo: "Efectivo",
   porCobrarMama: "Deuda mami",
-  tarjetaNu: "Tarjeta Nu",
-  mama: "Mamá",
+  tarjetaNu: "Tarjeta Nu crédito",
 };
 
 function isPocket(endpoint: MovementEndpoint | null): endpoint is PocketId {
-  return endpoint !== null && endpoint !== "mama";
+  return endpoint !== null;
 }
 
 /** Each pocket starts counting on the date of its earliest opening balance row. */
@@ -104,55 +102,6 @@ export function getCardDebt(movements: Movement[], asOf: IsoDate): Cents {
   return 0 - getLedgerBalances(movements, asOf).tarjetaNu;
 }
 
-export interface PaymentInput {
-  date: IsoDate;
-  fromCajita: Cents;
-  fromCash: Cents;
-  momGift: Cents;
-}
-
-/** One card payment can have several sources, and each one becomes its own row. */
-export function buildPaymentMovements(input: PaymentInput): MovementDraft[] {
-  const drafts: MovementDraft[] = [];
-  const base = { date: input.date, dataKind: "real" as const };
-
-  if (input.fromCajita > 0) {
-    drafts.push({
-      ...base,
-      type: "transfer",
-      amount: input.fromCajita,
-      from: "cajita",
-      to: "tarjetaNu",
-      category: null,
-      note: "Pago de tarjeta",
-    });
-  }
-  if (input.fromCash > 0) {
-    drafts.push({
-      ...base,
-      type: "transfer",
-      amount: input.fromCash,
-      from: "efectivo",
-      to: "tarjetaNu",
-      category: null,
-      note: "Pago de tarjeta (efectivo vía mamá)",
-    });
-  }
-  if (input.momGift > 0) {
-    drafts.push({
-      ...base,
-      type: "income",
-      amount: input.momGift,
-      from: null,
-      to: "tarjetaNu",
-      category: "mamá",
-      note: "Regalo de mamá al depositar a la tarjeta",
-    });
-  }
-
-  return drafts;
-}
-
 /** Category of the entries that only record what mom owes, like "Viaje EGS" in her card. */
 export const MOM_DEBT_CATEGORY = "Deuda mami";
 
@@ -162,25 +111,4 @@ export const MOM_DEBT_CATEGORY = "Deuda mami";
  */
 export function isMomDebtEntry(movement: Movement): boolean {
   return movement.type === "adjustment" && movement.category === MOM_DEBT_CATEGORY;
-}
-
-/** Records the difference between the app and Nu as yield. Null if they already match. */
-export function buildYieldAdjustment(
-  currentBalance: Cents,
-  realBalance: Cents,
-  date: IsoDate,
-): MovementDraft | null {
-  const difference = realBalance - currentBalance;
-  if (difference === 0) return null;
-
-  return {
-    date,
-    type: "adjustment",
-    amount: Math.abs(difference),
-    from: difference < 0 ? "cajita" : null,
-    to: difference > 0 ? "cajita" : null,
-    category: YIELD_CATEGORY,
-    note: "Ajuste de saldo con Nu",
-    dataKind: "real",
-  };
 }

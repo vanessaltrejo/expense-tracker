@@ -1,16 +1,9 @@
-import {
-  buildPaymentMovements,
-  buildYieldAdjustment,
-  getLedgerBalances,
-  type PaymentInput,
-} from "@/domain/ledger";
 import { generateExpectedCharges } from "@/domain/recurring";
 import type { Profile } from "@/domain/profile";
 import type {
   AppData,
   Cents,
   ExpectedCharge,
-  FixedExpense,
   IsoDate,
   Movement,
   MovementDraft,
@@ -84,22 +77,8 @@ function toSpendingDraft(input: {
   };
 }
 
-async function restartInterval(
-  expense: FixedExpense,
-  date: IsoDate,
-): Promise<Undo> {
-  if (expense.schedule.kind !== "everyNDays") return async () => undefined;
-
-  await repository.current.saveFixedExpense({
-    ...expense,
-    schedule: { ...expense.schedule, lastDate: date },
-  });
-  return () => repository.current.saveFixedExpense(expense);
-}
-
 export async function logShortcut(
   shortcut: Shortcut,
-  fixedExpenses: FixedExpense[],
   today: IsoDate,
 ): Promise<Undo> {
   if (shortcut.amount === null) {
@@ -114,17 +93,7 @@ export async function logShortcut(
       paidFrom: shortcut.paidFrom,
     }),
   ]);
-  const linked = fixedExpenses.find(
-    (expense) => expense.id === shortcut.fixedExpenseId,
-  );
-  const undoInterval = linked
-    ? await restartInterval(linked, today)
-    : async () => undefined;
-
-  return async () => {
-    await undoMovements(created)();
-    await undoInterval();
-  };
+  return undoMovements(created);
 }
 
 export async function saveShortcut(
@@ -144,35 +113,11 @@ export async function deleteShortcut(shortcut: Shortcut): Promise<Undo> {
 export async function logShortcutWithPrice(
   shortcut: Shortcut,
   amount: Cents,
-  fixedExpenses: FixedExpense[],
   today: IsoDate,
 ): Promise<Undo> {
   const priced = { ...shortcut, amount };
   await repository.current.saveShortcut(priced);
-  return logShortcut(priced, fixedExpenses, today);
-}
-
-/** Records an interval expense on its real date and restarts its reminder. */
-export async function logIntervalExpense(
-  expense: FixedExpense,
-  date: IsoDate,
-  paidFrom: MovementEndpoint,
-): Promise<Undo> {
-  const created = await repository.current.addMovements([
-    toSpendingDraft({
-      date,
-      amount: expense.normalAmount,
-      category: expense.category,
-      note: paidFrom === "mama" ? `${expense.name} (las pagó mamá)` : expense.name,
-      paidFrom,
-    }),
-  ]);
-  const undoInterval = await restartInterval(expense, date);
-
-  return async () => {
-    await undoMovements(created)();
-    await undoInterval();
-  };
+  return logShortcut(priced, today);
 }
 
 /** Saves just the charge that changed, for the same reason as above. */
@@ -215,14 +160,6 @@ export async function skipCharge(
   return () => updateCharge(charges, charge);
 }
 
-export async function changeChargeAmount(
-  charge: ExpectedCharge,
-  charges: ExpectedCharge[],
-  amount: Cents,
-): Promise<void> {
-  await updateCharge(charges, { ...charge, amount });
-}
-
 export async function moveBanorteToCajita(
   amount: Cents,
   today: IsoDate,
@@ -241,39 +178,6 @@ export async function moveBanorteToCajita(
 
 export async function savePaymentPlan(plan: PaymentPlan): Promise<void> {
   await repository.current.savePaymentPlan(plan);
-}
-
-/** Registers a payment and releases that much money from the plan. */
-export async function registerPayment(
-  input: PaymentInput,
-  plan: PaymentPlan,
-): Promise<Undo> {
-  const created = await repository.current.addMovements(buildPaymentMovements(input));
-  await repository.current.savePaymentPlan({
-    ...plan,
-    fromCajita: Math.max(0, plan.fromCajita - input.fromCajita),
-    fromCash: Math.max(0, plan.fromCash - input.fromCash),
-    momGift: Math.max(0, plan.momGift - input.momGift),
-  });
-
-  return async () => {
-    await undoMovements(created)();
-    await repository.current.savePaymentPlan(plan);
-  };
-}
-
-export async function adjustCajitaBalance(
-  data: AppData,
-  realBalance: Cents,
-  today: IsoDate,
-): Promise<Undo | null> {
-  const current = getLedgerBalances(
-    data.movements,
-    today,
-    data.settings.annualYieldRate,
-  ).cajita;
-  const adjustment = buildYieldAdjustment(current, realBalance, today);
-  return adjustment ? addMovement(adjustment) : null;
 }
 
 /** A JSON copy of everything, in case access to the device or the sheet is lost. */

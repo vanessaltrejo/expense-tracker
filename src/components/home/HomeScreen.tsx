@@ -9,7 +9,6 @@ import { moveBanorteToCajita } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
 import { PeriodBar } from "../ui/PeriodBar";
 import { POCKET_STYLES } from "../ui/styles";
-import { IntervalReminderCard } from "./IntervalReminderCard";
 import { MomDebtCard } from "./MomDebtCard";
 import { PocketsDetails } from "./PocketsDetails";
 import { UpcomingCharges } from "./UpcomingCharges";
@@ -88,7 +87,6 @@ export function HomeScreen() {
   const pending = data.movements.filter(
     (movement) => movement.dataKind !== "dummy" && movement.category === PENDING_CATEGORY,
   );
-  const dueReminders = dashboard.intervalReminders.filter((reminder) => reminder.isDue);
 
   return (
     <>
@@ -113,10 +111,6 @@ export function HomeScreen() {
           </Link>
         ))}
       </nav>
-
-      {dueReminders.map((reminder) => (
-        <IntervalReminderCard key={`${reminder.expense.id}-${today}`} reminder={reminder} />
-      ))}
 
       {pending.length > 0 ? (
         <section className="card bg-warning-soft">

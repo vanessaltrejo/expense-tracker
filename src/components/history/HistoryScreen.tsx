@@ -42,6 +42,14 @@ function describeRoute(movement: Movement): string {
   return from ?? to ?? "";
 }
 
+/** A negative amount already says it is a spend, so spends show only where the money came from. */
+function describeSubtitle(movement: Movement): string {
+  const route = describeRoute(movement);
+  const isSpend = movement.type === "expense" || movement.type === "cardExpense";
+  if (isSpend && route) return route;
+  return `${TYPE_LABELS[movement.type]} · ${route}`;
+}
+
 function getSign(movement: Movement): string {
   if (movement.type === "income") return "+";
   if (movement.type === "expense" || movement.type === "cardExpense") return "−";
@@ -54,7 +62,7 @@ function isBeforeOpening(
   openings: Partial<Record<PocketId, string>>,
 ): boolean {
   return [movement.from, movement.to].some((endpoint) => {
-    if (!endpoint || endpoint === "mama") return false;
+    if (!endpoint) return false;
     const opening = openings[endpoint];
     return Boolean(opening && movement.date < opening);
   });
@@ -106,7 +114,7 @@ function MovementRow({
       <div className="min-w-0 flex-1">
         <p className="font-medium first-letter:uppercase">{title}</p>
         <p className="text-sm text-ink-soft">
-          {TYPE_LABELS[movement.type]} · {describeRoute(movement)}
+          {describeSubtitle(movement)}
         </p>
         {canChangeCategory ? (
           <label className="mt-1 flex items-center gap-2 text-sm text-ink-soft">
