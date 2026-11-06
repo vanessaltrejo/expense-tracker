@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn, signOut } from "next-auth/react";
+import { signIn } from "next-auth/react";
 
 import { useFinance } from "../FinanceProvider";
 import { SHEET_URL } from "./sheetUrl";
@@ -17,16 +17,15 @@ export function SyncCard() {
 
   return (
     <section id="cuenta" className="card">
-      <h2 className="card-title">Tu Google Sheets</h2>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="card-title">Tu Google Sheets</h2>
+        {syncState.status === "synced" ? (
+          <p className="text-xs text-ink-soft">Sincronizado a las {formatTime(syncState.at)}</p>
+        ) : null}
+      </div>
 
       {syncState.status === "synced" ? (
         <>
-          <p className="text-sm">
-            <span className="pill bg-good-soft text-good">Conectado</span>{" "}
-            <span className="text-ink-soft">
-              {syncState.email} · sincronizado a las {formatTime(syncState.at)}
-            </span>
-          </p>
           {syncState.issues.length > 0 ? (
             <div className="rounded-xl bg-danger-soft p-3 text-sm">
               <p className="font-semibold text-danger">
@@ -73,7 +72,7 @@ export function SyncCard() {
           <button
             type="button"
             className="btn-primary col-span-2"
-            onClick={() => void signIn("google", { redirectTo: "/resumen" })}
+            onClick={() => void signIn("google", { redirectTo: "/perfil" })}
           >
             Conectar con Google
           </button>
@@ -93,16 +92,6 @@ export function SyncCard() {
           </>
         )}
       </div>
-
-      {syncState.status === "synced" ? (
-        <button
-          type="button"
-          className="min-h-11 text-sm text-ink-soft underline underline-offset-2"
-          onClick={() => void signOut({ redirectTo: "/resumen" })}
-        >
-          Cerrar sesión de Google
-        </button>
-      ) : null}
     </section>
   );
 }

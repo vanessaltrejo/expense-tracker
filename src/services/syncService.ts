@@ -6,7 +6,7 @@ import { getFinanceRepository } from "./financeRepository";
 export type SyncState =
   | { status: "idle" }
   | { status: "syncing" }
-  | { status: "synced"; at: string; email: string; issues: RowIssue[] }
+  | { status: "synced"; at: string; email: string; name: string; issues: RowIssue[] }
   | { status: "offline"; pending: number }
   | { status: "signedOut"; pending: number }
   | { status: "error"; pending: number };
@@ -15,6 +15,7 @@ interface SyncResponse {
   data: AppData;
   issues: RowIssue[];
   email: string;
+  name: string;
 }
 
 function isSyncResponse(value: unknown): value is SyncResponse {
@@ -23,7 +24,8 @@ function isSyncResponse(value: unknown): value is SyncResponse {
     value !== null &&
     "data" in value &&
     "issues" in value &&
-    "email" in value
+    "email" in value &&
+    "name" in value
   );
 }
 
@@ -31,7 +33,7 @@ let inFlight: Promise<SyncState> | null = null;
 
 async function runSync(): Promise<SyncState> {
   const repository = getFinanceRepository();
-  let pending = await repository.pendingOps();
+  const pending = await repository.pendingOps();
 
   // The first time this device connects, its own movements go up before the sheet wins.
   const { linkedAt } = await repository.getSyncInfo();
@@ -66,9 +68,15 @@ async function runSync(): Promise<SyncState> {
     body.data,
     pending.map((item) => item.seq),
   );
-  pending = await repository.pendingOps();
+  await repository.saveProfile({ name: body.name, email: body.email });
 
-  return { status: "synced", at: new Date().toISOString(), email: body.email, issues: body.issues };
+  return {
+    status: "synced",
+    at: new Date().toISOString(),
+    email: body.email,
+    name: body.name,
+    issues: body.issues,
+  };
 }
 
 /** Sends pending changes and pulls the sheet. Calls made while one runs share its result. */

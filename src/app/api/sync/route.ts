@@ -24,7 +24,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     await applyOps(client, ops);
     const snapshot = await readSnapshot(client);
-    return Response.json({ ...snapshot, email: access.email });
+    return Response.json({ ...snapshot, email: access.email, name: access.name });
   } catch (error) {
     const status = error instanceof SheetsError ? error.status : 500;
     // 401/403 from Google mean the permission was revoked: the app asks to sign in again.

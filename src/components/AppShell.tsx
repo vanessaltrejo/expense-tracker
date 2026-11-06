@@ -64,6 +64,16 @@ const rightItems: NavItem[] = [
       </NavIcon>
     ),
   },
+  {
+    href: "/perfil",
+    label: "Perfil",
+    icon: (
+      <NavIcon>
+        <circle cx="12" cy="8.5" r="3.5" />
+        <path d="M5 20c.8-3.6 3.4-5.5 7-5.5s6.2 1.9 7 5.5" />
+      </NavIcon>
+    ),
+  },
 ];
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {

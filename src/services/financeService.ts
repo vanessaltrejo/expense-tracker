@@ -6,6 +6,7 @@ import {
   type PaymentInput,
 } from "@/domain/ledger";
 import { generateExpectedCharges } from "@/domain/recurring";
+import type { Profile } from "@/domain/profile";
 import type {
   AppData,
   Cents,
@@ -303,6 +304,10 @@ export async function adjustCajitaBalance(
 }
 
 /** A JSON copy of everything, in case access to the device or the sheet is lost. */
+export async function getStoredProfile(): Promise<Profile | null> {
+  return repository.current.getProfile();
+}
+
 export async function exportBackup(): Promise<string> {
   const data = await repository.current.load();
   return JSON.stringify({ exportedAt: new Date().toISOString(), ...data }, null, 2);

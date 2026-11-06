@@ -5,6 +5,7 @@ import { isAllowedEmail } from "./allowedEmail";
 export interface GoogleAccess {
   accessToken: string;
   email: string;
+  name: string;
 }
 
 const REFRESH_MARGIN_SECONDS = 60;
@@ -49,16 +50,17 @@ export async function getGoogleAccess(request: Request): Promise<GoogleAccess | 
 
   const email = asString(token.email);
   if (!email || !isAllowedEmail(email)) return null;
+  const name = asString(token.name) ?? email;
 
   const accessToken = asString(token.googleAccessToken);
   const expiresAt = typeof token.googleExpiresAt === "number" ? token.googleExpiresAt : 0;
   const now = Math.floor(Date.now() / 1000);
 
   if (accessToken && expiresAt - REFRESH_MARGIN_SECONDS > now) {
-    return { accessToken, email };
+    return { accessToken, email, name };
   }
 
   const refreshToken = asString(token.googleRefreshToken);
   const refreshed = refreshToken ? await refreshAccessToken(refreshToken) : null;
-  return refreshed ? { accessToken: refreshed, email } : null;
+  return refreshed ? { accessToken: refreshed, email, name } : null;
 }

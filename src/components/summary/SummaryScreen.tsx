@@ -1,25 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
 
 import { buildMonthlySummary } from "@/domain/dashboard";
 import { formatMonthName, formatShortDate } from "@/domain/dates";
 import { formatMoney } from "@/domain/money";
-import { exportBackup } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
-import { SyncCard } from "../sync/SyncCard";
 import { CategoryChart } from "./CategoryChart";
-
-async function downloadBackup(today: string) {
-  const json = await exportBackup();
-  const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `mis-gastos-respaldo-${today}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
 
 function ComparisonRow({
   label,
@@ -139,30 +126,6 @@ export function SummaryScreen() {
           </ul>
         </section>
       ) : null}
-      <SyncCard />
-
-      <section className="card">
-        <h2 className="card-title">Respaldo</h2>
-        <p className="text-sm text-ink-soft">
-          Una copia de todo en un archivo, por si algún día pierdes el acceso a tu Sheets.
-        </p>
-        <button
-          type="button"
-          className="btn-secondary min-h-12"
-          onClick={() => void downloadBackup(today)}
-        >
-          Descargar respaldo (JSON)
-        </button>
-      </section>
-
-      <p className="flex justify-center gap-4 pb-2 text-xs text-ink-soft">
-        <Link href="/privacidad" className="underline underline-offset-2">
-          Privacidad
-        </Link>
-        <Link href="/terminos" className="underline underline-offset-2">
-          Términos
-        </Link>
-      </p>
     </>
   );
 }

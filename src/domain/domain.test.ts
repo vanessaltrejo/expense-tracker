@@ -10,6 +10,7 @@ import {
 } from "./dashboard.ts";
 import { dateInMonth, formatDayHeader, getTodayInMexico } from "./dates.ts";
 import { getHistoryCategories, matchesKind } from "./history.ts";
+import { getInitials } from "./profile.ts";
 import {
   buildPaymentMovements,
   buildYieldAdjustment,
@@ -131,6 +132,16 @@ function appData(movements: Movement[], today = "2026-11-03", cajitaRate = 0): A
     paymentPlan: { fromCajita: 0, fromCash: 0, momGift: 0, plannedDate: null },
   };
 }
+
+describe("profile", () => {
+  test("initials are the first letters of the first and last name", () => {
+    assert.equal(getInitials("Vanessa Trejo"), "VT");
+    assert.equal(getInitials("  vanessa   trejo "), "VT");
+    assert.equal(getInitials("Ana María López Ruiz"), "AR");
+    assert.equal(getInitials("Vanessa"), "V");
+    assert.equal(getInitials(""), "?");
+  });
+});
 
 describe("day headers", () => {
   test("read like Nu: weekday, day and short month", () => {

@@ -13,7 +13,8 @@ import {
 import { buildDashboard, type Dashboard } from "@/domain/dashboard";
 import { getTodayInMexico } from "@/domain/dates";
 import type { AppData, IsoDate } from "@/domain/types";
-import { loadFinanceData, type Undo } from "@/services/financeService";
+import type { Profile } from "@/domain/profile";
+import { getStoredProfile, loadFinanceData, type Undo } from "@/services/financeService";
 import { type SyncState, syncWithSheet } from "@/services/syncService";
 
 interface Toast {
@@ -35,6 +36,8 @@ interface FinanceContextValue {
   dismissToast: () => void;
   syncState: SyncState;
   syncNow: () => Promise<void>;
+  /** Name and email from the last time Google was connected, kept for offline use. */
+  profile: Profile | null;
 }
 
 const FinanceContext = createContext<FinanceContextValue | null>(null);
@@ -52,12 +55,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const [loadFailed, setLoadFailed] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
   const [syncState, setSyncState] = useState<SyncState>({ status: "idle" });
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   const refresh = useCallback(async () => {
     // "Today" comes from the device, so a server in another timezone can't change it.
     const today = getTodayInMexico();
     try {
       const data = await loadFinanceData(today);
+      setProfile(await getStoredProfile());
       setLoaded({ data, today });
       setLoadFailed(false);
     } catch {
@@ -138,8 +143,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       dismissToast,
       syncState,
       syncNow,
+      profile,
     };
-  }, [loaded, toast, runAction, undoToast, dismissToast, syncState, syncNow]);
+  }, [loaded, toast, runAction, undoToast, dismissToast, syncState, syncNow, profile]);
 
   const loadState = useMemo(
     () => ({ loadFailed, retry: refresh }),

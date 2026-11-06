@@ -8,6 +8,7 @@ import {
   seedStatements,
 } from "@/data/seedData";
 import { createId } from "@/domain/ids";
+import type { Profile } from "@/domain/profile";
 import type { SyncOp } from "@/domain/syncOps";
 import type {
   AppData,
@@ -42,6 +43,8 @@ export interface FinanceRepository {
   /** Replaces the local copy with the sheet, then re-applies changes not sent yet. */
   replaceWithSheet(data: AppData, sentSeqs: number[]): Promise<void>;
   getSyncInfo(): Promise<SyncInfo>;
+  getProfile(): Promise<Profile | null>;
+  saveProfile(profile: Profile): Promise<void>;
 }
 
 export interface PendingOp {
@@ -62,6 +65,7 @@ interface ConfigRow {
   nextShortcutId: number;
   linkedAt?: string | null;
   lastSyncedAt?: string | null;
+  profile?: Profile | null;
 }
 
 interface OutboxRow {
@@ -269,6 +273,16 @@ class DexieFinanceRepository implements FinanceRepository {
   async getSyncInfo(): Promise<SyncInfo> {
     const config = await this.getConfig();
     return { linkedAt: config.linkedAt ?? null, lastSyncedAt: config.lastSyncedAt ?? null };
+  }
+
+  async getProfile(): Promise<Profile | null> {
+    const config = await this.getConfig();
+    return config.profile ?? null;
+  }
+
+  async saveProfile(profile: Profile): Promise<void> {
+    await this.getConfig();
+    await this.db.config.update("main", { profile });
   }
 
   async replaceWithSheet(data: AppData, sentSeqs: number[]): Promise<void> {
