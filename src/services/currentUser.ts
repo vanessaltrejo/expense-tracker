@@ -17,6 +17,8 @@ function isSessionUser(value: unknown): value is SessionUser {
     typeof value.name === "string" &&
     "role" in value &&
     (value.role === "owner" || value.role === "viewer") &&
+    "layout" in value &&
+    (value.layout === "full" || value.layout === "simple") &&
     "tone" in value &&
     typeof value.tone === "string"
   );

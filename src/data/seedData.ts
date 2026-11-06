@@ -25,6 +25,8 @@ export const seedSettings: Settings = {
     "no sé",
   ],
   incomeCategories: ["horno³", "comedor", "mamá", "otros"],
+  places: [],
+  placeCategories: [],
 };
 
 /** Category for something to review later. The app reminds about these on Home. */

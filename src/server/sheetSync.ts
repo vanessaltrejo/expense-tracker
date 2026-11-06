@@ -57,7 +57,7 @@ export async function readSnapshot(client: SheetsClient): Promise<SheetSnapshot>
       `${quote(TAB.expectedCharges)}!A2:G`,
       `${quote(TAB.statements)}!A2:C`,
       `${quote(TAB.shortcuts)}!A2:E`,
-      `${quote(TAB.settings)}!A1:F40`,
+      `${quote(TAB.settings)}!A1:M40`,
     ]);
 
   const movements = parseRows(movementRows, parseMovementRow, TAB.movements, 2);

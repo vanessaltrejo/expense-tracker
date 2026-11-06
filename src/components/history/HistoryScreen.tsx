@@ -9,6 +9,7 @@ import {
   matchesKind,
 } from "@/domain/history";
 import { ENDPOINT_LABELS, getOpeningDates, isMomDebtEntry } from "@/domain/ledger";
+import { getTopPlaces } from "@/domain/places";
 import { formatMoney } from "@/domain/money";
 import { isInPeriod } from "@/domain/periods";
 import type {
@@ -25,6 +26,7 @@ import { formatCategory, getCategoryIcon, TYPE_STYLES } from "../ui/styles";
 
 /** Only the pockets that hold or owe money. Deuda mami has its own card on Home. */
 const ENDPOINTS: MovementEndpoint[] = ["cajita", "banorte", "efectivo", "tarjetaNu"];
+const SIMPLE_ENDPOINTS: MovementEndpoint[] = ["bbva", "efectivo"];
 
 const TYPE_LABELS: Record<MovementType, string> = {
   income: "Ingreso",
@@ -53,6 +55,9 @@ function getSign(movement: Movement): string {
   if (movement.type === "income") return "+";
   if (movement.type === "expense" || movement.type === "cardExpense") return "−";
   if (movement.type === "adjustment") return movement.to ? "+" : "−";
+  // A transfer to another person is money leaving; one coming in from outside is money entering.
+  if (movement.type === "transfer" && movement.from && !movement.to) return "−";
+  if (movement.type === "transfer" && movement.to && !movement.from) return "+";
   return "";
 }
 
@@ -92,6 +97,7 @@ function MovementRow({
   summaryOnly: boolean;
 }) {
   const { data, runAction, canEdit } = useFinance();
+  const subtitle = describeSubtitle(movement);
   const isDummy = movement.dataKind === "dummy";
   const canChangeCategory =
     canEdit && (movement.type === "expense" || movement.type === "cardExpense");
@@ -113,9 +119,7 @@ function MovementRow({
       </span>
       <div className="min-w-0 flex-1">
         <p className="font-medium first-letter:uppercase">{title}</p>
-        <p className="text-sm text-ink-soft">
-          {describeSubtitle(movement)}
-        </p>
+        {subtitle ? <p className="text-sm text-ink-soft">{subtitle}</p> : null}
         {canChangeCategory ? (
           <label className="mt-1 flex items-center gap-2 text-sm text-ink-soft">
             <span className="sr-only">Categoría de {title}</span>
@@ -174,11 +178,13 @@ function MovementRow({
 }
 
 export function HistoryScreen() {
-  const { data, dashboard } = useFinance();
+  const { data, dashboard, user } = useFinance();
   const { period } = dashboard;
+  const isSimple = user.layout === "simple";
   const [endpoint, setEndpoint] = useState("");
   const [category, setCategory] = useState("");
   const [kind, setKind] = useState<HistoryKind>("all");
+  const [place, setPlace] = useState("");
 
   const openings = useMemo(() => getOpeningDates(data.movements), [data.movements]);
 
@@ -192,9 +198,19 @@ export function HistoryScreen() {
         if (endpoint && movement.from !== endpoint && movement.to !== endpoint) {
           return false;
         }
+        if (place && movement.note.trim().toLowerCase() !== place.toLowerCase()) return false;
         return !category || movement.category === category;
       }),
-    [data.movements, period, endpoint, category, kind],
+    [data.movements, period, endpoint, category, kind, place],
+  );
+
+  // Places for the filter: every place spent at this period, only where places are asked for.
+  const placeOptions = useMemo(
+    () =>
+      isSimple
+        ? getTopPlaces(data.movements, data.settings, period, 50).map((item) => item.place)
+        : [],
+    [isSimple, data.movements, data.settings, period],
   );
 
   const categories = useMemo(() => getHistoryCategories(data.movements), [data.movements]);
@@ -241,6 +257,7 @@ export function HistoryScreen() {
       </div>
 
       <div className="grid grid-cols-2 gap-2">
+        {(
         <label className="field-label">
           Bolsa
           <select
@@ -249,13 +266,27 @@ export function HistoryScreen() {
             onChange={(event) => setEndpoint(event.target.value)}
           >
             <option value="">Todas</option>
-            {ENDPOINTS.map((item) => (
+            {(isSimple ? SIMPLE_ENDPOINTS : ENDPOINTS).map((item) => (
               <option key={item} value={item}>
                 {ENDPOINT_LABELS[item]}
               </option>
             ))}
           </select>
         </label>
+        )}
+        {placeOptions.length > 0 ? (
+          <label className="field-label">
+            Lugar
+            <select className="field" value={place} onChange={(event) => setPlace(event.target.value)}>
+              <option value="">Todos</option>
+              {placeOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <label className="field-label">
           Categoría
           <select

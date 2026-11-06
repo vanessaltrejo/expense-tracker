@@ -10,6 +10,7 @@ import { useFinance } from "../FinanceProvider";
 import { PeriodBar } from "../ui/PeriodBar";
 import { POCKET_STYLES } from "../ui/styles";
 import { MomDebtCard } from "./MomDebtCard";
+import { SimpleHome } from "./SimpleHome";
 import { PocketsDetails } from "./PocketsDetails";
 import { UpcomingCharges } from "./UpcomingCharges";
 import { YieldCard } from "./YieldCard";
@@ -81,7 +82,7 @@ function HeroBalance() {
   );
 }
 
-export function HomeScreen() {
+function FullHome() {
   const { data, dashboard, today, runAction, canEdit } = useFinance();
   const { balances } = dashboard;
   const pending = data.movements.filter(
@@ -166,4 +167,10 @@ export function HomeScreen() {
       <PocketsDetails />
     </>
   );
+}
+
+/** Each person sees the layout that fits how they use their money. */
+export function HomeScreen() {
+  const { user } = useFinance();
+  return user.layout === "simple" ? <SimpleHome /> : <FullHome />;
 }

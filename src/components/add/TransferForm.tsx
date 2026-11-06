@@ -11,9 +11,11 @@ import { useFinance } from "../FinanceProvider";
 import { AmountField } from "../ui/AmountField";
 
 /** Deuda mami, the card and what mom sends (an income) have their own places in the app. */
-type Place = Extract<PocketId, "banorte" | "cajita" | "efectivo">;
+type Place = Extract<PocketId, "banorte" | "cajita" | "efectivo" | "bbva">;
 const SOURCES: Place[] = ["banorte", "cajita", "efectivo"];
 const TARGETS: Place[] = ["cajita", "banorte", "efectivo"];
+/** The simple layout has two places: the BBVA account and cash. */
+const SIMPLE_PLACES: Place[] = ["bbva", "efectivo"];
 
 function Choice({
   label,
@@ -48,11 +50,14 @@ function Choice({
 
 /** Moves money between your places: an amount, where it leaves and where it lands. */
 export function TransferForm() {
-  const { dashboard, today, runAction } = useFinance();
+  const { dashboard, today, runAction, user } = useFinance();
+  const isSimple = user.layout === "simple";
+  const sources = isSimple ? SIMPLE_PLACES : SOURCES;
+  const targets = isSimple ? SIMPLE_PLACES : TARGETS;
   const router = useRouter();
   const [amountText, setAmountText] = useState("");
-  const [from, setFrom] = useState<Place>("banorte");
-  const [to, setTo] = useState<Place>("cajita");
+  const [from, setFrom] = useState<Place>(isSimple ? "bbva" : "banorte");
+  const [to, setTo] = useState<Place>(isSimple ? "efectivo" : "cajita");
 
   const amount = parseMoneyInput(amountText);
   const canSubmit = amount !== null && amount > 0;
@@ -89,8 +94,8 @@ export function TransferForm() {
   return (
     <form onSubmit={handleSubmit} className="card gap-4">
       <AmountField label="Monto" value={amountText} onChange={setAmountText} size="large" />
-      <Choice label="De" options={SOURCES} value={from} onChange={pickFrom} />
-      <Choice label="A" options={TARGETS} value={to} onChange={pickTo} />
+      <Choice label="De" options={sources} value={from} onChange={pickFrom} />
+      <Choice label="A" options={targets} value={to} onChange={pickTo} />
       <p className="amount text-sm text-ink-soft">
         En {ENDPOINT_LABELS[from]} hay {formatMoney(dashboard.balances[from])}.
       </p>

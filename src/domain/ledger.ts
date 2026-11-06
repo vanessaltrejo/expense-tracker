@@ -16,6 +16,7 @@ export const ENDPOINT_LABELS: Record<MovementEndpoint, string> = {
   efectivo: "Efectivo",
   porCobrarMama: "Deuda mami",
   tarjetaNu: "Tarjeta Nu crédito",
+  bbva: "BBVA",
 };
 
 function isPocket(endpoint: MovementEndpoint | null): endpoint is PocketId {
@@ -70,6 +71,7 @@ export function getLedgerBalances(
     efectivo: 0,
     porCobrarMama: 0,
     tarjetaNu: 0,
+    bbva: 0,
   };
 
   const counts = (pocket: PocketId, movement: Movement): boolean => {

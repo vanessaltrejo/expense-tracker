@@ -293,7 +293,7 @@ export function shortcutToRow(shortcut: Shortcut): Cell[] {
   ];
 }
 
-// ---------- Ajustes: values in B2:B6, category lists in E (gasto) and F (ingreso)
+// ---------- Ajustes: values in B2:B6, lists in E (gasto), F (ingreso), L (lugares), M (categorías con lugar)
 
 /** Rows of the Ajustes tab, starting at row 1 (the header). */
 export function parseSettings(
@@ -309,6 +309,9 @@ export function parseSettings(
 
   const expenseCategories = column(4);
   const incomeCategories = column(5);
+  // Columns L and M exist only in the simple layout's Sheet; elsewhere they stay empty.
+  const places = column(11);
+  const placeCategories = column(12);
 
   return {
     settings: {
@@ -321,6 +324,8 @@ export function parseSettings(
         expenseCategories.length > 0 ? expenseCategories : fallback.expenseCategories,
       incomeCategories:
         incomeCategories.length > 0 ? incomeCategories : fallback.incomeCategories,
+      places,
+      placeCategories,
     },
     plan: { plannedDate: cellToIsoDate(value(6)) },
   };

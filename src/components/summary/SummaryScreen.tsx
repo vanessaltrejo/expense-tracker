@@ -5,15 +5,25 @@ import { useMemo } from "react";
 import { buildPeriodSummary } from "@/domain/dashboard";
 import { formatShortDate } from "@/domain/dates";
 import { formatMoney } from "@/domain/money";
+import { getSentToPeople, getTopPlaces } from "@/domain/places";
 import { useFinance } from "../FinanceProvider";
 import { PeriodBar } from "../ui/PeriodBar";
 import { formatCategory, getCategoryIcon } from "../ui/styles";
 import { CategoryChart } from "./CategoryChart";
 
 export function SummaryScreen() {
-  const { data, today } = useFinance();
+  const { data, today, user } = useFinance();
+  const when = user.layout === "simple" ? "este mes" : "este periodo";
   const summary = useMemo(() => buildPeriodSummary(data, today), [data, today]);
   const hasSpending = summary.expenseCount > 0;
+  const topPlaces = useMemo(
+    () => getTopPlaces(data.movements, data.settings, summary.period, 5),
+    [data.movements, data.settings, summary.period],
+  );
+  const sent = useMemo(
+    () => getSentToPeople(data.movements, summary.period),
+    [data.movements, summary.period],
+  );
 
   return (
     <>
@@ -21,7 +31,7 @@ export function SummaryScreen() {
       <PeriodBar />
 
       <section className="card">
-        <h2 className="card-title">Gastaste en este periodo</h2>
+        <h2 className="card-title">Gastaste {when}</h2>
         <p className="amount -mt-2 text-3xl font-semibold">{formatMoney(summary.totalSpent)}</p>
         <p className="text-sm text-ink-soft">
           {summary.expenseCount === 1 ? "1 gasto" : `${summary.expenseCount} gastos`}
@@ -59,12 +69,47 @@ export function SummaryScreen() {
           </section>
         </>
       ) : (
-        <p className="card text-ink-soft">Todavía no hay gastos en este periodo.</p>
+        <p className="card text-ink-soft">Todavía no hay gastos {when}.</p>
       )}
+
+      {topPlaces.length > 0 ? (
+        <section className="card">
+          <h2 className="card-title">Dónde más gastaste {when}</h2>
+          <ul className="flex flex-col gap-3">
+            {topPlaces.map((item) => (
+              <li key={item.place} className="flex items-baseline justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="block font-medium">{item.place}</span>
+                  <span className="block text-sm text-ink-soft">
+                    {item.count === 1 ? "1 vez" : `${item.count} veces`}
+                  </span>
+                </span>
+                <span className="amount shrink-0 font-semibold">{formatMoney(item.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {sent.total > 0 ? (
+        <section className="card">
+          <h2 className="card-title">Enviaste a otras personas</h2>
+          <p className="amount -mt-2 text-2xl font-semibold">{formatMoney(sent.total)}</p>
+          <ul className="flex flex-col gap-1.5 text-sm">
+            {sent.people.map((item) => (
+              <li key={item.place} className="flex justify-between gap-3">
+                <span>{item.place}</span>
+                <span className="amount font-semibold">{formatMoney(item.amount)}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-ink-soft">Esto no cuenta como gasto.</p>
+        </section>
+      ) : null}
 
       {summary.income > 0 ? (
         <section className="card">
-          <h2 className="card-title">Te entró en este periodo</h2>
+          <h2 className="card-title">Te entró {when}</h2>
           <p className="amount -mt-2 text-2xl font-semibold text-good">
             {formatMoney(summary.income)}
           </p>

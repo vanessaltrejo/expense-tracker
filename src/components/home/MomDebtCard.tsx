@@ -30,6 +30,7 @@ const SOURCE_HELP: Record<Source, string> = {
   cajita: "",
   banorte: "",
   porCobrarMama: "",
+  bbva: "",
   registered:
     "Para algo que ya está en tu historial o en tu deuda inicial: solo sube Deuda mami, sin contarlo dos veces.",
 };

@@ -5,6 +5,7 @@ import { type FormEvent, useState } from "react";
 
 import { ENDPOINT_LABELS } from "@/domain/ledger";
 import { formatMoney, parseMoneyInput } from "@/domain/money";
+import { getFrequentPlaces } from "@/domain/places";
 import type { MovementDraft, MovementEndpoint, PocketId } from "@/domain/types";
 import { addMovement, saveShortcut } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
@@ -17,6 +18,8 @@ export type MovementFormKind = "expense" | "income";
 const EXPENSE_SOURCES: MovementEndpoint[] = ["tarjetaNu", "efectivo", "cajita", "banorte"];
 /** What her mom sends always lands in Banorte, so that income never asks where it went. */
 const MOM_INCOME_CATEGORY = "mamá";
+/** The two places of the simple layout, BBVA first because most things go through it. */
+const SIMPLE_SOURCES: PocketId[] = ["bbva", "efectivo"];
 const INCOME_TARGETS: PocketId[] = ["banorte", "efectivo"];
 function PocketSelect<T extends MovementEndpoint>({
   label,
@@ -51,7 +54,9 @@ function PocketSelect<T extends MovementEndpoint>({
 }
 
 export function MovementForm({ kind }: { kind: MovementFormKind }) {
-  const { data, today, runAction } = useFinance();
+  const { data, today, runAction, user } = useFinance();
+  // The simple layout has two places for money: the BBVA account and cash.
+  const isSimple = user.layout === "simple";
   const router = useRouter();
 
   const [amountText, setAmountText] = useState("");
@@ -59,8 +64,8 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
   const [date, setDate] = useState(today);
   const [note, setNote] = useState("");
   const [keepAsShortcut, setKeepAsShortcut] = useState(false);
-  const [expenseFrom, setExpenseFrom] = useState<MovementEndpoint>("tarjetaNu");
-  const [incomeTo, setIncomeTo] = useState<PocketId>("banorte");
+  const [expenseFrom, setExpenseFrom] = useState<MovementEndpoint>(isSimple ? "bbva" : "tarjetaNu");
+  const [incomeTo, setIncomeTo] = useState<PocketId>(isSimple ? "bbva" : "banorte");
 
   const amount = parseMoneyInput(amountText);
   const isFromMom = kind === "income" && category === MOM_INCOME_CATEGORY;
@@ -70,8 +75,30 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
     Boolean(date) &&
     category !== null;
 
-  const categories =
+  const allCategories =
     kind === "income" ? data.settings.incomeCategories : data.settings.expenseCategories;
+
+  // The simple layout shows the most used categories first and hides the rest behind a
+  // button, so a long list never crowds the form.
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const usage = new Map<string, number>();
+  for (const movement of data.movements) {
+    if (movement.category) usage.set(movement.category, (usage.get(movement.category) ?? 0) + 1);
+  }
+  const ranked = [...allCategories].sort(
+    (a, b) => (usage.get(b) ?? 0) - (usage.get(a) ?? 0),
+  );
+  const VISIBLE_CATEGORIES = 6;
+  const isCrowded = isSimple && allCategories.length > VISIBLE_CATEGORIES + 1;
+  const categories =
+    isCrowded && !showAllCategories
+      ? ranked.filter((option, index) => index < VISIBLE_CATEGORIES || option === category)
+      : isSimple
+        ? ranked
+        : allCategories;
+
+  const places = kind === "expense" ? getFrequentPlaces(data.movements, data.settings, category) : [];
+  const asksForPlace = kind === "expense" && category !== null && data.settings.placeCategories.includes(category);
 
   const buildDraft = (validAmount: number): MovementDraft => {
     const base = {
@@ -117,27 +144,37 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
 
   const canSaveShortcut = kind === "expense";
 
+  const noteField = (
+    <label className="field-label">
+      {asksForPlace ? "Lugar (o escribe otro)" : isSimple ? "Detalle (opcional)" : "¿En qué fue?"}
+      <input
+        className="field"
+        type="text"
+        placeholder={
+          kind === "income"
+            ? "Ej. quincena de horno³"
+            : asksForPlace
+              ? "Ej. Shake Shack"
+              : "Ej. chilaquiles Super Salads"
+        }
+        value={note}
+        onChange={(event) => setNote(event.target.value)}
+      />
+      <span className="text-xs font-normal">Así se verá en tu historial.</span>
+    </label>
+  );
+
   return (
     <form onSubmit={handleSubmit} className="card gap-4">
       <AmountField label="Monto" value={amountText} onChange={setAmountText} size="large" />
 
-      <label className="field-label">
-        ¿En qué fue?
-        <input
-          className="field"
-          type="text"
-          placeholder={kind === "income" ? "Ej. quincena de horno³" : "Ej. chilaquiles Super Salads"}
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-        />
-        <span className="text-xs font-normal">Así se verá en tu historial.</span>
-      </label>
+      {isSimple ? null : noteField}
 
       {kind === "expense" ? (
         <PocketSelect
           label="¿Con qué se pagó?"
           value={expenseFrom}
-          options={EXPENSE_SOURCES}
+          options={isSimple ? SIMPLE_SOURCES : EXPENSE_SOURCES}
           onChange={setExpenseFrom}
         />
       ) : null}
@@ -146,7 +183,7 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
         <PocketSelect
           label="¿A dónde cayó?"
           value={incomeTo}
-          options={INCOME_TARGETS}
+          options={isSimple ? SIMPLE_SOURCES : INCOME_TARGETS}
           onChange={setIncomeTo}
         />
       ) : null}
@@ -166,8 +203,38 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
               <span>{formatCategory(option)}</span>
             </button>
           ))}
+          {isCrowded ? (
+            <button
+              type="button"
+              className="chip text-ink-soft"
+              onClick={() => setShowAllCategories(!showAllCategories)}
+            >
+              {showAllCategories ? "Ver menos" : "Ver todas"}
+            </button>
+          ) : null}
         </div>
       </fieldset>
+
+      {places.length > 0 ? (
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1.5 text-sm font-medium text-ink-soft">Lugar</legend>
+          <div className="flex flex-wrap gap-2">
+            {places.map((place) => (
+              <button
+                key={place}
+                type="button"
+                aria-pressed={note.trim().toLowerCase() === place.toLowerCase()}
+                className="chip"
+                onClick={() => setNote(note.trim().toLowerCase() === place.toLowerCase() ? "" : place)}
+              >
+                {place}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+
+      {isSimple ? noteField : null}
 
       <label className="field-label">
         Fecha

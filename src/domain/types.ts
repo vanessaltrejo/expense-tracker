@@ -9,7 +9,9 @@ export type PocketId =
   | "banorte"
   | "efectivo"
   | "porCobrarMama"
-  | "tarjetaNu";
+  | "tarjetaNu"
+  /** The single debit account of the simple layout. */
+  | "bbva";
 
 /** Where money leaves from or lands in. Mom never appears: what she owes lives in Deuda mami. */
 export type MovementEndpoint = PocketId;
@@ -89,6 +91,10 @@ export interface Settings {
   annualYieldRate: number;
   expenseCategories: string[];
   incomeCategories: string[];
+  /** Frequent places (Shake Shack, Cinépolis…), offered as one-tap buttons. Optional per person. */
+  places: string[];
+  /** The categories where the place buttons appear. */
+  placeCategories: string[];
 }
 
 export interface PaymentPlan {

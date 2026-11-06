@@ -222,6 +222,20 @@ Cada persona entra con **usuario y contraseña** y usa la app en su propio telé
 | **Mami** (solo lectura) | El Sheets de Vanessa | Solo mirar: no agrega, no borra, no abre el Sheets ni descarga respaldos |
 | **Francisco** | Su propio Sheets | Todo, en su espacio |
 
+### La versión simple de Francisco
+
+Francisco no usa tarjeta de crédito, cajita ni Deuda mami: tiene **una cuenta de BBVA y algo de efectivo** donde le depositan su mamá y su papá, y quiere ver **en qué gasta**. Por eso su app tiene un **layout simple**, que es la misma app con menos piezas:
+
+- **Dos lugares para el dinero: su BBVA y el efectivo.** Los gastos e ingresos preguntan cuál (BBVA ya viene elegido), y **Mover** pasa dinero entre ellos, por ejemplo al sacar del cajero.
+- **Por mes de calendario**, no por periodos de tarjeta. Por dentro es el mismo cálculo de periodos con el día de corte en 1.
+- **Inicio:** cuánto tiene en total (con BBVA y efectivo por separado), cuánto gastó y cuánto le entró este mes, y en qué gastó (gráfica por categoría). Sus saldos iniciales ya están en su Sheets; si faltara alguno, la app lo pide.
+- **Agregar:** **Gasto**, **Ingreso** ("Me depositaron"), **Mover** y **Transferí**, con atajos para lo que repite (bread de pan de chocolate, snacks de 7-Eleven, gym day pass, corte de pelo, gasolina).
+- **Categorías de gasto:** dates, salidas, antojos de Vane, antojos míos, snacks, bread, gym, higiene, gasolina, cortes de pelo, shopping, otros y pendiente. Las edita en la pestaña Ajustes de su Sheets. **Ingresos:** mamá, papá y otros. Para que la lista no sature, el formulario muestra primero las 6 más usadas y el resto queda detrás de "Ver todas".
+- **Lugares:** en las categorías donde tiene sentido (dates, salidas, antojos y snacks, bread) aparece una fila de botones con sus lugares frecuentes (Shake Shack, Galleta Moonwalk, Carl's Jr, Wingstop, Super Salads, Elite Cinema, Cinépolis). Los más usados salen primero y solo se ven 8. Puede escribir otro lugar ahí mismo, y si lo escribe dos veces, se vuelve botón. La lista y las categorías con lugar viven en las columnas L y M de Ajustes, y el lugar se guarda en la Nota del movimiento.
+- **Transferí:** dinero que le manda a otra persona (Vanessa, Mamá, Papá u otra). Sale de su BBVA pero **no cuenta como gasto**: en el Resumen aparece aparte, como "Enviaste a otras personas".
+- **Resumen:** gasto por categoría, "Dónde más gastaste este mes" (lugares), lo enviado a otras personas y lo que le entró. Historial tiene filtro por lugar.
+- **Su Sheets** muestra solo Movimientos, Atajos, Ajustes y **Resumen del mes**. Las pestañas que la app usa por dentro (Gastos fijos, Pagos esperados y Cortes) están escondidas.
+
 - **Todos los Sheets viven en la cuenta de Google de Vanessa.** El de su novio se le comparte a su correo para que él también lo pueda abrir.
 - **El modo de solo lectura se aplica en el servidor**, no solo escondiendo botones: si llegara un cambio desde la cuenta de solo lectura, el servidor lo rechaza.
 - **Cada persona tiene su propia copia en el teléfono** (una base de datos local por usuario), así que si dos comparten un dispositivo, sus datos no se mezclan.

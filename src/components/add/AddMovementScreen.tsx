@@ -6,16 +6,18 @@ import { useEffect, useState } from "react";
 import { useFinance } from "../FinanceProvider";
 import { MovementForm, type MovementFormKind } from "./MovementForm";
 import { PaymentForm } from "./PaymentForm";
+import { SendForm } from "./SendForm";
 import { ShortcutList } from "./ShortcutList";
 import { TransferForm } from "./TransferForm";
 
-type AddTab = MovementFormKind | "transfer" | "payment";
+type AddTab = MovementFormKind | "transfer" | "payment" | "send";
 
 const TABS: { id: AddTab; icon: string; label: string; param: string }[] = [
   { id: "expense", icon: "↑", label: "Gasto", param: "gasto" },
   { id: "income", icon: "↓", label: "Ingreso", param: "ingreso" },
   { id: "transfer", icon: "⇄", label: "Mover", param: "mover" },
   { id: "payment", icon: "✓", label: "Pagar tarjeta", param: "pago" },
+  { id: "send", icon: "↗", label: "Transferí", param: "enviar" },
 ];
 
 const TAB_HELP: Record<AddTab, string> = {
@@ -24,10 +26,25 @@ const TAB_HELP: Record<AddTab, string> = {
   transfer:
     "Mover dinero entre tus bolsas. No es un gasto.",
   payment: "Lo que abonaste a la tarjeta, siempre de tu Cajita Nu Débito. Puedes pagar en varias partes.",
+  send: "",
+};
+
+const SIMPLE_TAB_HELP: Partial<Record<AddTab, string>> = {
+  expense: "Algo que gastaste, con tu BBVA o con efectivo.",
+  income: "Dinero que te depositaron: tu mamá, tu papá u otros.",
+  transfer: "Mover dinero entre tu BBVA y tu efectivo, por ejemplo cuando sacas del cajero. No es un gasto.",
+  send: "Dinero que le mandaste a alguien. Sale de tu BBVA, pero no cuenta como gasto.",
 };
 
 function AddMovementContent({ initialTab }: { initialTab: AddTab }) {
-  const [tab, setTab] = useState<AddTab>(initialTab);
+  const { user } = useFinance();
+  const isSimple = user.layout === "simple";
+  const tabs = isSimple
+    ? TABS.filter((item) => item.id !== "payment")
+    : TABS.filter((item) => item.id !== "send");
+  const [tab, setTab] = useState<AddTab>(
+    tabs.some((item) => item.id === initialTab) ? initialTab : "expense",
+  );
 
   return (
     <>
@@ -38,7 +55,7 @@ function AddMovementContent({ initialTab }: { initialTab: AddTab }) {
         aria-label="Tipo de movimiento"
         className="flex gap-1.5"
       >
-        {TABS.map((item) => (
+        {tabs.map((item) => (
           <button
             key={item.id}
             type="button"
@@ -52,11 +69,14 @@ function AddMovementContent({ initialTab }: { initialTab: AddTab }) {
           </button>
         ))}
       </div>
-      <p className="-mt-1 px-1 text-sm text-ink-soft">{TAB_HELP[tab]}</p>
+      <p className="-mt-1 px-1 text-sm text-ink-soft">
+        {(isSimple && SIMPLE_TAB_HELP[tab]) || TAB_HELP[tab]}
+      </p>
 
       {tab === "expense" ? <ShortcutList /> : null}
       {tab === "payment" ? <PaymentForm /> : null}
       {tab === "transfer" ? <TransferForm /> : null}
+      {tab === "send" ? <SendForm /> : null}
       {tab === "expense" || tab === "income" ? (
         // The key resets the form so nothing typed carries over to another type.
         <MovementForm key={tab} kind={tab} />

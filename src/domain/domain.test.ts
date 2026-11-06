@@ -19,6 +19,7 @@ import {
   OPENING_BALANCE_CATEGORY,
 } from "./ledger.ts";
 import { parseMoneyInput, pesos } from "./money.ts";
+import { getFrequentPlaces, getSentToPeople, getTopPlaces } from "./places.ts";
 import { generateExpectedCharges } from "./recurring.ts";
 import type {
   AppData,
@@ -36,6 +37,8 @@ const settings: Settings = {
   annualYieldRate: 0.13,
   expenseCategories: [],
   incomeCategories: [],
+  places: [],
+  placeCategories: [],
 };
 
 function row(draft: Partial<MovementDraft> & Pick<MovementDraft, "date" | "type" | "amount">, id = "x"): Movement {
@@ -163,6 +166,89 @@ describe("periods", () => {
   });
 });
 
+describe("simple layout (one BBVA account, by month)", () => {
+  test("deposits add and spends subtract from the one account", () => {
+    const movements = [
+      opening("bbva", 1_000),
+      row({ date: "2026-11-02", type: "income", amount: pesos(500), to: "bbva", category: "mamá" }),
+      row({ date: "2026-11-03", type: "expense", amount: pesos(120), from: "bbva", category: "gym" }),
+    ];
+    assert.equal(getLedgerBalances(movements, "2026-11-04").bbva, pesos(1_380));
+  });
+
+  test("a cut day of 1 makes the period a calendar month", () => {
+    const period = getPeriodForDate("2026-11-15", { cutDay: 1, dueDay: 1 });
+    assert.equal(period.start, "2026-11-01");
+    assert.equal(period.end, "2026-11-30");
+    assert.equal(getPeriodForDate("2026-12-01", { cutDay: 1, dueDay: 1 }).start, "2026-12-01");
+  });
+});
+
+describe("places and sent money (simple layout)", () => {
+  const placeSettings: Settings = {
+    ...settings,
+    places: ["Shake Shack", "Wingstop", "Cinépolis"],
+    placeCategories: ["salidas", "dates"],
+  };
+  const spend = (date: string, note: string, category = "salidas", amount = 100) =>
+    row({ date, type: "expense", amount: pesos(amount), from: "bbva", category, note });
+
+  test("buttons come from the Sheet, most used first, and only for categories that ask for a place", () => {
+    const movements = [
+      spend("2026-11-01", "Wingstop"),
+      spend("2026-11-02", "Wingstop"),
+      spend("2026-11-03", "Shake Shack"),
+    ];
+    assert.deepEqual(getFrequentPlaces(movements, placeSettings, "salidas"), [
+      "Wingstop",
+      "Shake Shack",
+      "Cinépolis",
+    ]);
+    assert.deepEqual(getFrequentPlaces(movements, placeSettings, "gym"), []);
+    assert.deepEqual(getFrequentPlaces(movements, placeSettings, null), []);
+  });
+
+  test("a place typed twice becomes a button, once does not", () => {
+    const movements = [
+      spend("2026-11-01", "Carl's Jr"),
+      spend("2026-11-02", "carl's jr"),
+      spend("2026-11-03", "Tacos del Tec"),
+    ];
+    const places = getFrequentPlaces(movements, placeSettings, "dates");
+    assert.ok(places.includes("Carl's Jr"));
+    assert.ok(!places.includes("Tacos del Tec"));
+  });
+
+  test("top places add up what was spent at each, ignoring other categories", () => {
+    const period = getPeriodForDate("2026-11-15", { cutDay: 1, dueDay: 1 });
+    const movements = [
+      spend("2026-11-01", "Wingstop", "salidas", 200),
+      spend("2026-11-05", "wingstop", "dates", 150),
+      spend("2026-11-06", "Shake Shack", "salidas", 90),
+      spend("2026-11-07", "Day pass", "gym", 120),
+    ];
+    const top = getTopPlaces(movements, placeSettings, period, 5);
+    assert.deepEqual(top.map((item) => [item.place, item.amount, item.count]), [
+      ["Wingstop", pesos(350), 2],
+      ["Shake Shack", pesos(90), 1],
+    ]);
+  });
+
+  test("money sent to a person leaves the account but is not spending", () => {
+    const period = getPeriodForDate("2026-11-15", { cutDay: 1, dueDay: 1 });
+    const movements = [
+      opening("bbva", 1_000),
+      row({ date: "2026-11-03", type: "transfer", amount: pesos(300), from: "bbva", note: "A Vanessa" }),
+      row({ date: "2026-11-04", type: "transfer", amount: pesos(100), from: "bbva", note: "A Mamá" }),
+    ];
+    assert.equal(getLedgerBalances(movements, "2026-11-05").bbva, pesos(600));
+    const sent = getSentToPeople(movements, period);
+    assert.equal(sent.total, pesos(400));
+    assert.deepEqual(sent.people.map((item) => item.place), ["A Vanessa", "A Mamá"]);
+    assert.equal(buildPeriodSummary(appData(movements, "2026-11-05"), "2026-11-05").totalSpent, 0);
+  });
+});
+
 describe("users", () => {
   test("Vanessa and Francisco own their data; Mami only reads Vanessa's Sheet", () => {
     assert.deepEqual(APP_USERS.map((user) => [user.id, user.role]), [
@@ -186,7 +272,7 @@ describe("users", () => {
   test("the browser only learns the id, name, role and color", () => {
     const vanessa = findUserById("vanessa");
     assert.ok(vanessa);
-    assert.deepEqual(Object.keys(toSessionUser(vanessa)).sort(), ["id", "name", "role", "tone"]);
+    assert.deepEqual(Object.keys(toSessionUser(vanessa)).sort(), ["id", "layout", "name", "role", "tone"]);
   });
 });
 

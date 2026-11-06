@@ -11,12 +11,19 @@ export type UserRole = "owner" | "viewer";
 
 export type AvatarTone = "violet" | "teal" | "orange";
 
+/**
+ * - full:   cajita, Banorte, cash, the Nu credit card and Deuda mami, by card period.
+ * - simple: one debit account (BBVA), what comes in and what is spent, by calendar month.
+ */
+export type UserLayout = "full" | "simple";
+
 export interface AppUser {
   id: string;
   /** What is typed to sign in. Compared without caring about uppercase or spaces. */
   username: string;
   name: string;
   role: UserRole;
+  layout: UserLayout;
   tone: AvatarTone;
   passwordHashEnv: string;
   sheetIdEnv: string;
@@ -28,6 +35,7 @@ export const APP_USERS: AppUser[] = [
     username: "vanessa",
     name: "Vanessa Trejo",
     role: "owner",
+    layout: "full",
     tone: "violet",
     passwordHashEnv: "PASSWORD_HASH_VANESSA",
     sheetIdEnv: "GOOGLE_SHEETS_ID",
@@ -37,6 +45,7 @@ export const APP_USERS: AppUser[] = [
     username: "mami",
     name: "Mami",
     role: "viewer",
+    layout: "full",
     tone: "teal",
     passwordHashEnv: "PASSWORD_HASH_MAMI",
     // She reads Vanessa's Sheet.
@@ -47,6 +56,7 @@ export const APP_USERS: AppUser[] = [
     username: "francisco",
     name: "Francisco Amaya",
     role: "owner",
+    layout: "simple",
     tone: "orange",
     passwordHashEnv: "PASSWORD_HASH_FRANCISCO",
     sheetIdEnv: "GOOGLE_SHEETS_ID_FRANCISCO",
@@ -74,9 +84,10 @@ export interface SessionUser {
   id: string;
   name: string;
   role: UserRole;
+  layout: UserLayout;
   tone: AvatarTone;
 }
 
 export function toSessionUser(user: AppUser): SessionUser {
-  return { id: user.id, name: user.name, role: user.role, tone: user.tone };
+  return { id: user.id, name: user.name, role: user.role, layout: user.layout, tone: user.tone };
 }

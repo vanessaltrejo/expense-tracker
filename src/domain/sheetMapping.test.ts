@@ -24,6 +24,8 @@ const fallback: Settings = {
   annualYieldRate: 0.13,
   expenseCategories: ["comida"],
   incomeCategories: ["horno³"],
+  places: [],
+  placeCategories: [],
 };
 
 describe("sheet cells", () => {
@@ -89,6 +91,13 @@ describe("Movimientos rows", () => {
     assert.equal(result.issues.length, 0);
   });
 
+  test("the BBVA account reads and writes with its own label", () => {
+    const parsed = parseMovementRow(["1", 46331, "Gasto", 50, "BBVA", "", "gym", "Day pass", "Real"]);
+    assert.ok("value" in parsed);
+    assert.equal(parsed.value.from, "bbva");
+    assert.equal(movementToRow({ ...parsed.value, id: "1" })[4], "BBVA");
+  });
+
   test("blank rows are skipped and bad rows are reported with their row number", () => {
     const result = parseRows(
       [["H1", 46331, "Gasto", 10, "Efectivo", "", "otros", "", "Real"], [], ["H2", "x", "Gasto", 10, "Efectivo"]],
@@ -126,6 +135,17 @@ describe("other tabs", () => {
     assert.deepEqual(parsedShortcut.value, shortcut);
   });
 
+  test("the simple layout's Sheet can list places and the categories that ask for one", () => {
+    const rows: (string | number | null)[][] = [
+      ["Ajuste", "Valor", "Nota", null, "Gasto", "Ingreso", "Bolsas", "Tipos", "Estados", "Dato", "Todas", "Lugares", "Categorías con lugar"],
+      ["x", 0, "", null, "salidas", "mamá", "BBVA", "", "", "", "", "Shake Shack", "salidas"],
+      ["x", 1, "", null, "dates", "papá", "", "", "", "", "", "Cinépolis", "dates"],
+    ];
+    const { settings } = parseSettings(rows, fallback);
+    assert.deepEqual(settings.places, ["Shake Shack", "Cinépolis"]);
+    assert.deepEqual(settings.placeCategories, ["salidas", "dates"]);
+  });
+
   test("Ajustes gives the settings, the category lists and the payment day", () => {
     const rows = [
       ["Ajuste", "Valor", "Nota", null, "Categorías", "Categorías de ingreso"],
@@ -140,6 +160,9 @@ describe("other tabs", () => {
     assert.deepEqual(settings.expenseCategories, ["comida", "pendiente"]);
     assert.deepEqual(settings.incomeCategories, ["horno³", "comedor"]);
     assert.deepEqual(plan, { plannedDate: "2026-11-29" });
+    // Without the simple layout's columns, there are no places.
+    assert.deepEqual(settings.places, []);
+    assert.deepEqual(settings.placeCategories, []);
   });
 });
 

@@ -10,6 +10,7 @@ export const POCKET_STYLES: Record<
   efectivo: { text: "text-efectivo", soft: "bg-efectivo-soft", bar: "bg-efectivo" },
   porCobrarMama: { text: "text-cobrar", soft: "bg-cobrar-soft", bar: "bg-cobrar" },
   tarjetaNu: { text: "text-tarjeta", soft: "bg-tarjeta-soft", bar: "bg-tarjeta" },
+  bbva: { text: "text-cajita", soft: "bg-cajita-soft", bar: "bg-cajita" },
 };
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -24,6 +25,17 @@ const CATEGORY_ICONS: Record<string, string> = {
   otros: "📦",
   pendiente: "⏳",
   "no sé": "❓",
+  bread: "🥐",
+  dates: "💞",
+  gym: "🏋️",
+  higiene: "🧼",
+  gasolina: "⛽",
+  snacks: "🍫",
+  "antojos de Vane": "🍩",
+  "antojos míos": "🍟",
+  "cortes de pelo": "💈",
+  shopping: "🛍️",
+  papá: "👨",
   "horno³": "💼",
   comedor: "🍲",
   Rendimiento: "📈",

@@ -11,7 +11,8 @@ import { useFinance } from "../FinanceProvider";
  * current period is the only one with complete information, so the list has just that one.
  */
 export function PeriodBar() {
-  const { dashboard } = useFinance();
+  const { dashboard, user } = useFinance();
+  const isSimple = user.layout === "simple";
   const { period } = dashboard;
   const [isOpen, setIsOpen] = useState(false);
 
@@ -25,11 +26,11 @@ export function PeriodBar() {
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className="min-w-0">
-          <span className="block text-xs text-ink-soft">Periodo</span>
+          <span className="block text-xs text-ink-soft">{isSimple ? "Mes" : "Periodo"}</span>
           <span className="block font-semibold">{formatPeriodRange(period)}</span>
         </span>
         <span className="flex shrink-0 items-center gap-2 text-xs text-ink-soft">
-          Se paga el {formatShortDate(period.dueDate)}
+          {isSimple ? "" : `Se paga el ${formatShortDate(period.dueDate)}`}
           <span aria-hidden="true" className={`transition-transform ${isOpen ? "rotate-180" : ""}`}>
             ▾
           </span>
@@ -43,7 +44,7 @@ export function PeriodBar() {
             <span className="text-xs font-medium">Actual ✓</span>
           </p>
           <p className="text-xs text-ink-soft">
-            Los periodos anteriores se podrán ver aquí cuando tengan su información completa.
+            {isSimple ? "Los meses anteriores" : "Los periodos anteriores"} se podrán ver aquí cuando tengan su información completa.
           </p>
         </div>
       ) : null}
