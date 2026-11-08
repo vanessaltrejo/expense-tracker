@@ -11,16 +11,18 @@ import {
 } from "@/domain/history";
 import { ENDPOINT_LABELS, isMomDebtEntry } from "@/domain/ledger";
 import { getTopPlaces, placeOfNote } from "@/domain/places";
-import { formatMoney } from "@/domain/money";
+import { centsToInput, formatMoney, parseMoneyInput } from "@/domain/money";
 import { isInPeriod } from "@/domain/periods";
 import type {
   Movement,
   MovementEndpoint,
   MovementType,
 } from "@/domain/types";
-import { changeMovementCategory, deleteMovement } from "@/services/financeService";
+import { changeMovementCategory, deleteMovement, editMovement } from "@/services/financeService";
 import { PENDING_CATEGORY } from "@/data/seedData";
 import { useFinance } from "../FinanceProvider";
+import { AmountField } from "../ui/AmountField";
+import { DateField } from "../ui/DateField";
 import { PeriodBar } from "../ui/PeriodBar";
 import { formatCategory, getCategoryIcon, TYPE_STYLES } from "../ui/styles";
 
@@ -43,11 +45,12 @@ function describeRoute(movement: Movement): string {
   return from ?? to ?? "";
 }
 
-/** A negative amount already says it is a spend, so spends show only where the money came from. */
+/** The sign already says it is a spend or an income, so they show only the pocket involved. */
 function describeSubtitle(movement: Movement): string {
   const route = describeRoute(movement);
   const isSpend = movement.type === "expense" || movement.type === "cardExpense";
-  if (isSpend && route) return route;
+  // A "+" amount already says it is an income, so it shows only where the money landed.
+  if ((isSpend || movement.type === "income") && route) return route;
   return `${TYPE_LABELS[movement.type]} · ${route}`;
 }
 
@@ -115,6 +118,63 @@ function BreakdownList({ movement, parts }: { movement: Movement; parts: Movemen
   );
 }
 
+/** Fixes the amount, the day or the note of one movement, right under its row. */
+function MovementEditor({
+  movement,
+  parts,
+  onDone,
+}: {
+  movement: Movement;
+  parts: Movement[];
+  onDone: () => void;
+}) {
+  const { today, runAction } = useFinance();
+  const [amountText, setAmountText] = useState(centsToInput(movement.amount));
+  const [date, setDate] = useState(movement.date);
+  const [note, setNote] = useState(movement.note);
+
+  const amount = parseMoneyInput(amountText);
+  // Only an opening balance can start at zero, like Banorte did.
+  const validAmount = amount !== null && (amount > 0 || movement.type === "adjustment");
+  const changed =
+    amount !== movement.amount || date !== movement.date || note.trim() !== movement.note;
+  const canSave = validAmount && Boolean(date) && changed;
+
+  return (
+    <form
+      className="ml-13 mt-3 flex flex-col gap-3 rounded-2xl bg-page p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!canSave || amount === null) return;
+        void runAction("Movimiento actualizado", () =>
+          editMovement(movement, { amount, date, note: note.trim() }, parts),
+        );
+        onDone();
+      }}
+    >
+      <AmountField label="Monto" value={amountText} onChange={setAmountText} />
+      <label className="field-label">
+        Nota
+        <input
+          className="field"
+          type="text"
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+        />
+      </label>
+      <DateField value={date} max={today} onChange={setDate} />
+      <div className="grid grid-cols-2 gap-2">
+        <button type="submit" className="btn-primary" disabled={!canSave}>
+          Guardar cambios
+        </button>
+        <button type="button" className="btn-secondary" onClick={onDone}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function MovementRow({
   movement,
   parts,
@@ -123,16 +183,14 @@ function MovementRow({
   parts: Movement[];
 }) {
   const { data, runAction, canEdit } = useFinance();
+  const [isEditing, setIsEditing] = useState(false);
   const subtitle = describeSubtitle(movement);
-  const isDummy = movement.dataKind === "dummy";
   const canChangeCategory =
     canEdit && (movement.type === "expense" || movement.type === "cardExpense");
   const title = movement.note || movement.category || TYPE_LABELS[movement.type];
 
   return (
-    <li
-      className={`border-t border-line py-3 first:border-t-0 ${isDummy ? "opacity-55" : ""}`}
-    >
+    <li className="border-t border-line py-3 first:border-t-0">
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
@@ -169,8 +227,8 @@ function MovementRow({
             // Skipped when it would only repeat the title, like "Saldo inicial".
             <p className="text-sm text-ink-soft">{formatCategory(movement.category)}</p>
           ) : null}
-          {isDummy ? (
-            <p className="mt-1 text-xs font-semibold">Dummy: no cuenta en saldos ni Resumen</p>
+          {movement.dataKind === "previo" ? (
+            <p className="mt-1 text-xs font-semibold">Previo: ya estaba antes de la app, no mueve saldos</p>
           ) : null}
         </div>
         <div className="flex shrink-0 flex-col items-end">
@@ -179,21 +237,33 @@ function MovementRow({
             {formatMoney(movement.amount)}
           </p>
           {canEdit ? (
-            <button
-              type="button"
-              className="min-h-11 pl-3 text-sm text-ink-soft underline underline-offset-2"
-              aria-label={`Borrar ${title}`}
-              onClick={() =>
-                void runAction(parts.length > 0 ? "Movimiento y desglose borrados" : "Movimiento borrado", () =>
-                  deleteMovement(movement, parts),
-                )
-              }
-            >
-              Borrar
-            </button>
+            <div className="flex items-center">
+              <button
+                type="button"
+                className="min-h-11 pl-3 text-sm text-ink-soft underline underline-offset-2"
+                aria-label={`Editar ${title}`}
+                aria-expanded={isEditing}
+                onClick={() => setIsEditing(!isEditing)}
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                className="min-h-11 pl-3 text-sm text-ink-soft underline underline-offset-2"
+                aria-label={`Borrar ${title}`}
+                onClick={() =>
+                  void runAction(parts.length > 0 ? "Movimiento y desglose borrados" : "Movimiento borrado", () =>
+                    deleteMovement(movement, parts),
+                  )
+                }
+              >
+                Borrar
+              </button>
+            </div>
           ) : null}
         </div>
       </div>
+      {isEditing ? <MovementEditor movement={movement} parts={parts} onDone={() => setIsEditing(false)} /> : null}
       {parts.length > 0 ? (
         // Under the whole row, from the text on, so the receipt gets the space beside the amount.
         <div className="ml-13">

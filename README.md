@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Pockets
 
-## Getting Started
+App de gastos personal (Next.js + Google Sheets) para Vanessa, su mamá (solo lectura) y Francisco. Cada persona tiene su propio Google Sheets, que es la fuente de verdad; la app guarda una copia en el teléfono y sincroniza.
 
-First, run the development server:
+**Para entender cómo funciona y por qué está hecha así, lee [Pockets - Como funciona la app.md](<Pockets - Como funciona la app.md>).**
+
+## Correrla
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local   # llena los valores (ver comentarios dentro)
+npm install
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Las contraseñas se guardan como hash: `npm run hash-password`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Revisar
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run typecheck   # tipos
+npm run lint        # estilo
+npm test            # pruebas
+```
 
-## Learn More
+## Dónde está cada cosa
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `src/domain`: las reglas del dinero (saldos, periodos, cobros, mapeo con el Sheets). Sin dependencias de pantalla.
+- `src/services`: guardado local (IndexedDB) y sincronización.
+- `src/server`: lo que habla con Google Sheets.
+- `src/components` y `src/app`: las pantallas.

@@ -1,9 +1,11 @@
 import { parseSyncOps } from "@/domain/syncOps";
 import { canEdit, toSessionUser } from "@/domain/users";
 import { getCurrentUser, getSheetId } from "@/server/currentUser";
+import { SheetLayoutError } from "@/domain/sheetColumns";
 import { getServiceAccountToken } from "@/server/serviceAccount";
 import { SheetsClient, SheetsError } from "@/server/sheetsClient";
-import { applyOps, readSnapshot } from "@/server/sheetSync";
+import { withSheetLock } from "@/server/sheetLock";
+import { applyOps, readSnapshot, sortMovementsByDate } from "@/server/sheetSync";
 
 /**
  * POST /api/sync: writes the app's pending changes to the user's sheet, then returns the
@@ -31,8 +33,12 @@ export async function POST(request: Request): Promise<Response> {
 
   const client = new SheetsClient(accessToken, spreadsheetId);
   try {
-    await applyOps(client, ops);
-    const snapshot = await readSnapshot(client);
+    // One sync at a time per Sheet: rows are found by position, and sorting or deleting moves them.
+    const snapshot = await withSheetLock(spreadsheetId, async () => {
+      await applyOps(client, ops);
+      if (ops.some((op) => op.kind === "upsertMovements")) await sortMovementsByDate(client);
+      return readSnapshot(client);
+    });
     return Response.json({
       ...snapshot,
       user: toSessionUser(user),
@@ -42,6 +48,10 @@ export async function POST(request: Request): Promise<Response> {
         : null,
     });
   } catch (error) {
+    // A column the app needs was renamed or deleted: nothing is written, and the message says which.
+    if (error instanceof SheetLayoutError) {
+      return Response.json({ error: "sheetLayout", detail: error.message }, { status: 422 });
+    }
     const status = error instanceof SheetsError ? error.status : 500;
     // 403/404 from Google: the Sheet isn't shared with the service account (or doesn't exist).
     const code = status === 403 || status === 404 ? "notConfigured" : "sheetsError";

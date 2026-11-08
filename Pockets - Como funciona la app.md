@@ -54,12 +54,13 @@ Pockets es una **PWA**: una página web que se instala en el teléfono y se comp
 | **Libro (ledger)** | Cada bolsa es un libro: dinero que entró menos dinero que salió. Los saldos **nunca se guardan**, siempre se calculan. |
 | **Saldo inicial** | El saldo con el que empieza una bolsa en una fecha. Lo anterior a esa fecha ya no mueve el saldo. |
 | **Corte** | El día 22: Nu cierra el estado de cuenta de la tarjeta. |
-| **Fecha límite** | El día 1: último día para pagar lo del corte anterior. |
+| **Fecha límite** | Normalmente el día 1: último día para pagar lo del corte anterior. Si Nu la mueve un mes, se escribe en la pestaña Cortes y vale solo para ese corte. |
 | **Periodo** | Del 22 de un mes al 21 del siguiente. Se paga el día 1. La versión de Vanessa lee todo en periodos. |
 | **Deuda mami** | Lo que la mamá de Vanessa le debe. Es un registro de seguimiento, no dinero real. |
 | **Layout** | La versión de pantallas que ve una persona: **completo** (Vanessa y Mami) o **simple** (Francisco). |
 | **Rol** | Qué puede hacer: **dueño** (todo) o **solo lectura** (solo mirar). |
 | **Dummy** | Dato de relleno marcado visiblemente. No cuenta en saldos ni en el Resumen. |
+| **Previo** | Algo real que pasó antes de la app y que ya está dentro de los saldos iniciales (todo lo anterior al 22 de octubre de 2026 y los ingresos del 29 de octubre). Cuenta en los resúmenes y en las vistas del Sheets, pero nunca mueve saldos ni la deuda de la tarjeta. |
 | **Sheet gana** | Si algo cambia a la vez en la app y en el Sheets, se queda lo del Sheets. |
 | **Cuenta de servicio** | Un "robot" de Google que la app usa para leer y escribir los Sheets compartidos con él. |
 
@@ -134,7 +135,9 @@ Nu cierra su estado de cuenta el día 22 y se paga el día 1. Entonces:
 
 Qué entra al pago del día 1: lo comprado hasta el día 21 y los cobros esperados que caen antes del corte. Lo demás pasa al siguiente periodo. (Hoy solo se ve el periodo actual; los anteriores se podrán ver cuando tengan su información completa.)
 
-El estado de cuenta de cada corte viene de la pestaña **Cortes** del Sheets. Si un corte no está ahí, la app lo calcula con la deuda del día anterior. Cada pago cuenta aunque sea chico: si el estado es 300 y se pagan 100 un día y 200 el siguiente, queda pagado completo.
+El estado de cuenta de cada corte viene de la pestaña **Cortes** del Sheets. Si un corte no está ahí, la app lo calcula con la deuda del día anterior.
+
+**Fecha límite distinta un mes:** normalmente es el día de Ajustes (el 1), pero si Nu la mueve (por ejemplo, el corte del 22 de noviembre se paga el 3 de diciembre), se agrega la fila de ese corte en **Cortes** con su fecha límite y la app la usa solo para ese corte. El estado de cuenta puede quedar vacío mientras no salga: la app sigue calculando la deuda. Cada pago cuenta aunque sea chico: si el estado es 300 y se pagan 100 un día y 200 el siguiente, queda pagado completo.
 
 ---
 
@@ -150,16 +153,16 @@ Todo lo que pasa es un **movimiento** de uno de estos tipos:
 | **Transferencia** | Mueve dinero entre bolsas, o lo manda a otra persona; **no es un gasto** | De Banorte a la cajita; pagar la tarjeta |
 | **Ajuste** | Corrige o inicia un saldo | El **Saldo inicial** de una bolsa |
 
-Cada movimiento guarda: un **ID**, la **fecha**, el **tipo**, el **monto** (en centavos), de qué bolsa **sale** ("De"), a cuál **entra** ("A"), la **categoría**, una **nota** y si es dato **Real** o **Dummy**.
+Cada movimiento guarda: un **ID**, la **fecha**, el **tipo**, el **monto** (en centavos), de qué bolsa **sale** ("De"), a cuál **entra** ("A"), la **categoría**, una **nota** y si es dato **Real**, **Previo** o **Dummy**.
 
 En la versión de Vanessa se crean con cuatro pestañas dentro de **Agregar**:
 
 - **Gasto:** monto, "¿en qué fue?", "¿con qué se pagó?" (viene con la tarjeta ya elegida, porque casi todo va ahí), categoría, fecha y la opción de guardarlo como frecuente. Arriba hay **atajos** para lo que se repite.
-- **Ingreso:** monto, a dónde cayó (Banorte o efectivo) y categoría.
-- **Mover:** monto, de qué bolsa a cuál (entre Banorte, cajita y efectivo). Viene lista con Banorte → Cajita, lo más común.
-- **Pagar tarjeta:** solo el monto. **Siempre sale de la Cajita Nu Débito.**
+- **Ingreso:** monto, nota (opcional), a dónde cayó (Banorte o efectivo), categoría y fecha. Cada ingreso se agrega a mano con su categoría (horno³, comedor, mamá u otros); no hay días fijos de pago.
+- **Mover:** monto, de qué bolsa a cuál (entre Banorte, cajita y efectivo) y fecha. Viene lista con Banorte → Cajita, lo más común. También sirve para mandar dinero a una persona.
+- **Pagar tarjeta:** el monto y la fecha (hoy por defecto, por si el pago fue otro día). **Siempre sale de la Cajita Nu Débito.**
 
-> **Por qué "Pagar tarjeta" pide solo el monto:** se usa una o dos veces al mes y siempre sale de la cajita. Pedir "de dónde" era un paso que nunca cambiaba. Por dentro es una transferencia de la cajita a la tarjeta con la nota "Pago de tarjeta". Se puede pagar en varias partes: cada parte es un pago.
+> **Por qué "Pagar tarjeta" no pregunta de dónde sale:** se usa una o dos veces al mes y siempre sale de la cajita. Pedir "de dónde" era un paso que nunca cambiaba. Por dentro es una transferencia de la cajita a la tarjeta con la nota "Pago de tarjeta". Se puede pagar en varias partes: cada parte es un pago.
 
 > **Por qué Mover no incluye la tarjeta ni Deuda mami:** cada una ya tiene su flujo propio (Pagar tarjeta y la tarjeta de Deuda mami). Tenerlas en dos lugares confundía.
 
@@ -209,6 +212,7 @@ Estos registros de seguimiento **no aparecen como gasto** en el Historial: la co
 - Cada bolsa es un libro: lo que **entró** menos lo que **salió**.
 - La **tarjeta** al revés: su deuda es lo que salió de ella menos lo que entró (los pagos).
 - **Saldo inicial:** las bolsas con dinero real empiezan con una fila de tipo Ajuste, categoría "Saldo inicial", con fecha. Lo que tenga fecha **anterior** a ese saldo ya no mueve el saldo de esa bolsa (pero sí cuenta en el Resumen, porque sigue siendo un gasto de ese periodo). La tarjeta y Deuda mami salen de sus movimientos.
+- **Datos Previo:** lo que pasó antes de la app y ya está dentro de los saldos iniciales. Cuenta en el Resumen y en las vistas del Sheets, pero no mueve ningún saldo ni la deuda de la tarjeta. Se marca en la columna Dato.
 - **Datos Dummy:** no cuentan en saldos ni en el Resumen. Se ven en gris con la etiqueta "Dummy". Se usan cuando falta un dato real. Los datos de ejemplo del código **nunca** se escriben en el Sheets.
 - **Dinero:** siempre se guarda en **centavos** (enteros) y se muestra en pesos. Así nunca hay errores de redondeo con decimales.
 - **Fechas:** se guardan como texto `AAAA-MM-DD` y "hoy" es la fecha del teléfono en horario de Ciudad de México, para que un servidor en otra zona horaria no cambie el día.
@@ -239,11 +243,14 @@ Las suscripciones se cobran cada mes o cada año a la tarjeta. La app las maneja
 En Inicio, **Próximos cobros** muestra los que caen antes del siguiente corte (los que caen después aparecen cuando cambia el periodo). Cada cobro tiene dos botones:
 
 - **Ya se cobró:** lo convierte en un gasto con tarjeta (con la fecha del cargo, o la de hoy si llegó antes) y lo marca Cobrado.
+- **Se cobró otro día:** igual, pero eligiendo la fecha real del cargo. El cobro conserva su identidad y queda con la fecha en que de verdad se cobró.
 - **Omitir:** lo marca Omitido; no cuenta.
 
 Si pasa el día y no se confirma, sigue como esperado y se marca **Atrasado**.
 
-Los cobros esperados se **suman al pago del día 1** (la línea "Con tus suscripciones, el 1 pagas"), pero **no** se restan del dinero hasta que se cobran de verdad. La app genera cobros con una regla de **solo agregar**: nunca sobreescribe el estado de un cobro que ya existe (por eso un "Cobrado" nunca vuelve a "Esperado" al sincronizar).
+**Cambiar el día de una suscripción:** se cambia en **Gastos fijos**. Los cobros futuros que se habían generado con el día anterior (y que nadie movió a mano) se borran solos y se generan con el día nuevo. Un cobro cuya fecha se cambió a mano en **Pagos esperados** nunca se toca.
+
+Los cobros esperados se **suman al pago del día 1** (la línea "Con tus suscripciones, el día límite pagas"), pero **no** se restan del dinero hasta que se cobran de verdad. La app genera cobros con una regla de **solo agregar**: nunca sobreescribe el estado de un cobro que ya existe (por eso un "Cobrado" nunca vuelve a "Esperado" al sincronizar).
 
 > **Por qué se quitó "toca el monto si este mes cambia":** el monto de cada cobro es el de la suscripción. Cambiarlo cobro por cobro era una función poco usada que ocupaba espacio y generaba errores. Si el precio cambia de verdad, se edita en la hoja Gastos fijos.
 >
@@ -265,13 +272,14 @@ La barra de abajo tiene cuatro destinos y un botón central **+** (que no aparec
 
 Los movimientos **del periodo actual** (o del mes, en la versión simple), agrupados por día ("Viernes 6 nov"), como en Nu.
 - Filtros: Todo / Gastos / Ingresos, por **bolsa** y por **categoría** (las categorías cambian según el tipo). En la versión simple también por **lugar**.
-- Se puede cambiar la categoría de un gasto directo en la lista, y **Borrar** un movimiento (solo quien puede editar).
+- Se puede cambiar la categoría de un gasto directo en la lista, **Editar** un movimiento (monto, nota y fecha) y **Borrar** (solo quien puede editar). Editar actualiza la misma fila del Sheets, no agrega otra. Los ingresos se muestran solo con la bolsa donde cayeron: el signo + ya dice que es un ingreso.
+- Lo marcado **Previo** muestra una etiqueta: ya estaba antes de la app y no mueve saldos.
 - Lo que es solo seguimiento de Deuda mami no se lista. Los movimientos anteriores a un saldo inicial se ven atenuados, porque solo cuentan en el Resumen.
 - Un gasto sin categoría clara se marca **pendiente**; Inicio avisa "N gastos por revisar" para ponérsela después.
 
 ### Resumen
 
-Del **periodo actual** (o mes): cuánto se gastó y en cuántos gastos, **en qué se gastó** (barras por categoría con monto y porcentaje), **lo más grande** (los tres gastos mayores) y cuánto entró. La versión simple suma "Dónde más gastaste" y "Enviaste a otras personas".
+Del **periodo actual** (o mes): cuánto se gastó y en cuántos gastos, **en qué se gastó** (barras por categoría con monto y porcentaje), **lo más grande** (los cuatro gastos mayores). La versión simple suma "Dónde más gastaste" y "Enviaste a otras personas".
 
 ### Perfil
 
@@ -337,16 +345,16 @@ El Sheets **es la fuente de verdad**: la app escribe ahí cada cambio y lee lo q
 | **Movimientos** | ID, Fecha, Tipo, Monto, De, A, Categoría, Nota, Dato | Una fila por movimiento. Montos en pesos, sin signo. |
 | **Gastos fijos** | ID, Nombre, Monto normal, Frecuencia, Día, Mes, Categoría, Desde, Hasta, Activo | Las suscripciones. **La app solo las lee.** Frecuencia: Mensual o Anual. |
 | **Pagos esperados** | ID, Gasto fijo, Nombre, Fecha, Monto, Categoría, Estado (+ "Se paga el", calculada) | Los cobros que genera la app. |
-| **Cortes** | Fecha de corte, Fecha límite, Estado de cuenta (+ columnas calculadas) | El monto de cada estado de cuenta. **La app solo lo lee.** |
+| **Cortes** | Fecha de corte, Fecha límite, Estado de cuenta (+ columnas calculadas) | El monto y la fecha límite de cada estado de cuenta. El monto puede quedar vacío mientras no salga. **La app solo lo lee.** |
 | **Atajos** | ID, Nombre, Monto, Categoría, Se paga con | Gastos frecuentes. |
-| **Ajustes** | Valores en B2:B6 (límite de tarjeta, día de corte, día límite de pago, tasa, día de pago) y listas en E (gasto), F (ingreso), G (bolsas), H (tipos), I (estados), J (dato), K (todas las categorías), L (lugares) y M (categorías con lugar) | Configuración y las listas de los menús desplegables. |
+| **Ajustes** | Valores en B2:B6 (límite de tarjeta, día de corte, día límite de pago, tasa, día de pago) y listas en E (gasto), F (ingreso), G (bolsas), H (tipos), I (estados), J (dato), K (todas las categorías, se calcula sola a partir de E y F), L (lugares) y M (categorías con lugar) | Configuración y las listas de los menús desplegables. |
 
 ### Pestañas de vista (solo para mirar)
 
 - **Vanessa:** **Resumen del periodo**, **Gastos fijos por periodo** e **Ingresos por quincena**.
 - **Francisco:** **Resumen del mes**.
 
-Se calculan solas con fórmulas, la app **nunca** escribe en ellas, y están protegidas contra edición accidental. Las de Vanessa usan los mismos periodos de tarjeta (del 22 al 21) que la app, así que los totales coinciden con la pantalla Resumen. El día de corte sale de Ajustes: si cambia, las vistas se acomodan solas. "Ingresos por quincena" no agrupa por periodo, sino por día de pago (14 y 29).
+Se calculan solas con fórmulas, la app **nunca** escribe en ellas, y están protegidas contra edición accidental. Las de Vanessa usan los mismos periodos de tarjeta (del 22 al 21) que la app, así que los totales coinciden con la pantalla Resumen. "Gastos fijos por periodo" se recorre sola cada mes: siempre muestra los últimos once periodos y el siguiente. El día de corte sale de Ajustes: si cambia, las vistas se acomodan solas. "Ingresos por quincena" no agrupa por periodo, sino por día de pago (14 y 29).
 
 ### Reglas para editar a mano
 
@@ -355,7 +363,7 @@ Se calculan solas con fórmulas, la app **nunca** escribe en ellas, y están pro
 - Los menús desplegables evitan equivocarse en tipo, bolsa, categoría, estado y dato.
 - Una fila con error (monto con letras, tipo inexistente, bolsa que no existe) **se marca y no se cuenta** hasta corregirla. La app no se rompe: muestra cuántas filas tienen problema.
 - Una fila con una casilla "Activo" marcada pero sin nombre, monto ni ID se toma como un gasto fijo incompleto y se reporta como error. Si no es gasto, desmarca la casilla.
-- Un dato de relleno se marca **Dummy** en la columna Dato.
+- Un dato de relleno se marca **Dummy** en la columna Dato. Lo real que pasó antes de la app (ya incluido en los saldos iniciales) se marca **Previo**.
 
 Las tablas se ven bien a propósito: encabezados oscuros, el periodo (o mes) actual resaltado en amarillo y los anteriores en verde, montos con formato de pesos, primera fila y columna fijas, y estados con color (Esperado amarillo, Cobrado verde, Omitido gris, atrasado rojo).
 
@@ -371,7 +379,8 @@ La app es **offline-first**: funciona sin internet y sincroniza cuando puede.
 4. Se sincroniza al abrirse la app, cada vez que se vuelve a ella, al recuperar internet y después de cada cambio.
 5. **El Sheets gana**: lo que vuelve del Sheets reemplaza la copia del teléfono, pero los cambios que todavía no se habían subido se vuelven a aplicar encima (así nada se pierde si se hizo algo sin internet).
 6. Un cambio pendiente solo se descarta de la bandeja cuando el servidor confirmó que lo escribió.
-7. **Solo lectura:** la cuenta de Mami nunca manda cambios; solo recibe el Sheets. Si algún cambio llegara a su sesión, el servidor lo rechaza.
+7. **Cambios al mismo tiempo:** varios cambios a un mismo movimiento se juntan en uno antes de mandarse (un gasto agregado y borrado antes de sincronizar ni llega al Sheets), lo que se cambia mientras una sincronización está en camino se manda enseguida, y el servidor quita las filas repetidas que dos sincronizaciones simultáneas pudieran crear. Al borrar, se borran todas las filas con ese ID.
+8. **Solo lectura:** la cuenta de Mami nunca manda cambios; solo recibe el Sheets. Si algún cambio llegara a su sesión, el servidor lo rechaza.
 
 El servidor **valida cada cambio** que llega del navegador, campo por campo, antes de tocar el Sheets (nunca confía en lo que mande el teléfono). Un aviso delgado arriba indica cuando algo necesita atención: "Sin internet · 2 cambios por subir", "Tu sesión terminó, vuelve a entrar", "Tu Sheets todavía no está listo" o "No se pudo sincronizar".
 

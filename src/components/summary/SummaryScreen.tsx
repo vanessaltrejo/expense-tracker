@@ -109,15 +109,6 @@ export function SummaryScreen() {
           <p className="text-xs text-ink-soft">Esto no cuenta como gasto.</p>
         </section>
       ) : null}
-
-      {!isSimple && summary.income > 0 ? (
-        <section className="card">
-          <h2 className="card-title">Te entró {when}</h2>
-          <p className="amount -mt-2 text-2xl font-semibold text-good">
-            {formatMoney(summary.income)}
-          </p>
-        </section>
-      ) : null}
     </>
   );
 }

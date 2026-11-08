@@ -30,7 +30,6 @@ export function placeOfNote(note: string, places: string[]): string {
 
 function isPlaceSpend(movement: Movement, settings: Settings): boolean {
   return (
-    movement.dataKind === "real" &&
     movement.type === "expense" &&
     movement.category !== null &&
     settings.placeCategories.includes(movement.category) &&

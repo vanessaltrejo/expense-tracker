@@ -17,7 +17,7 @@ export function PocketsDetails() {
 
   return (
     <section className="card">
-      <h2 className="font-medium">Bolsas y crédito</h2>
+      <h2 className="card-title">Bolsas y crédito</h2>
 
       <ul className="grid grid-cols-2 gap-2">
         {POCKETS.map((pocket) => (

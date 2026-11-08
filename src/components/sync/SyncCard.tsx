@@ -62,6 +62,13 @@ export function SyncCard() {
         </p>
       ) : null}
 
+      {syncState.status === "layoutError" ? (
+        <p className="text-sm text-ink-soft">
+          {syncState.detail}. Vuelve a ponerla con ese nombre en la fila 1 y se sincroniza sola.
+          Tus datos siguen guardados aquí.
+        </p>
+      ) : null}
+
       {syncState.status === "offline" || syncState.status === "error" ? (
         <p className="text-sm text-ink-soft">
           {syncState.status === "offline"

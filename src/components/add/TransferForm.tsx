@@ -10,6 +10,7 @@ import type { PocketId } from "@/domain/types";
 import { addMovement, addMovementWithBreakdown } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
 import { AmountField } from "../ui/AmountField";
+import { DateField } from "../ui/DateField";
 import { BreakdownEditor, type BreakdownPart } from "./BreakdownEditor";
 
 /** Deuda mami, the card and what mom sends (an income) have their own places in the app. */
@@ -60,11 +61,12 @@ function OwnTransferForm() {
   const [amountText, setAmountText] = useState("");
   const [from, setFrom] = useState<Place>(isSimple ? "bbva" : "banorte");
   const [to, setTo] = useState<Place>(isSimple ? "efectivo" : "cajita");
+  const [date, setDate] = useState(today);
 
   const [parts, setParts] = useState<BreakdownPart[]>([]);
 
   const amount = parseMoneyInput(amountText);
-  const canSubmit = amount !== null && amount > 0;
+  const canSubmit = amount !== null && amount > 0 && Boolean(date);
   // Taking cash out of BBVA is the one move with something to account for: what it paid for.
   const isWithdrawal = isSimple && from === "bbva" && to === "efectivo";
 
@@ -83,7 +85,7 @@ function OwnTransferForm() {
     if (!canSubmit || amount === null) return;
 
     const movement = {
-      date: today,
+      date,
       type: "transfer" as const,
       amount,
       from,
@@ -100,7 +102,7 @@ function OwnTransferForm() {
             movement,
             // The cash is spent from the pocket the withdrawal filled.
             spent.map((part) => ({
-              date: today,
+              date,
               type: "expense" as const,
               amount: part.amount,
               from: "efectivo" as const,
@@ -130,6 +132,7 @@ function OwnTransferForm() {
       <p className="amount text-sm text-ink-soft">
         En {ENDPOINT_LABELS[from]} hay {formatMoney(dashboard.balances[from])}.
       </p>
+      <DateField value={date} max={today} onChange={setDate} />
       <button type="submit" className="btn-primary" disabled={!canSubmit}>
         Guardar
       </button>
@@ -152,6 +155,7 @@ function PersonTransferForm() {
   const [person, setPerson] = useState<string | null>(null);
   const [other, setOther] = useState("");
   const [from, setFrom] = useState<Place>("banorte");
+  const [date, setDate] = useState(today);
 
   const people = [...DEFAULT_PEOPLE];
   for (const movement of data.movements) {
@@ -165,14 +169,14 @@ function PersonTransferForm() {
 
   const amount = parseMoneyInput(amountText);
   const recipient = (person ?? other).trim();
-  const canSubmit = amount !== null && amount > 0 && recipient !== "";
+  const canSubmit = amount !== null && amount > 0 && recipient !== "" && Boolean(date);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!canSubmit || amount === null) return;
     void runAction(`Enviaste ${formatMoney(amount)} a ${recipient}`, () =>
       addMovement({
-        date: today,
+        date,
         type: "transfer",
         amount,
         from,
@@ -224,6 +228,8 @@ function PersonTransferForm() {
       <p className="amount text-sm text-ink-soft">
         En {ENDPOINT_LABELS[from]} hay {formatMoney(dashboard.balances[from])}.
       </p>
+
+      <DateField value={date} max={today} onChange={setDate} />
 
       <button type="submit" className="btn-primary" disabled={!canSubmit}>
         Guardar

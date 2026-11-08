@@ -10,7 +10,18 @@ import type {
 
 type BillingDays = Pick<Settings, "cutDay" | "dueDay">;
 
-export function getDueDateForCut(cutDate: IsoDate, days: BillingDays): IsoDate {
+/**
+ * The last day to pay a cut. Nu usually keeps the same day, but sometimes moves it for one
+ * month: a row in Cortes with that cut's own due date wins over the usual day.
+ */
+export function getDueDateForCut(
+  cutDate: IsoDate,
+  days: BillingDays,
+  records: StatementRecord[] = [],
+): IsoDate {
+  const own = records.find((record) => record.cutDate === cutDate);
+  if (own) return own.dueDate;
+
   const { year, month } = getYearMonth(cutDate);
   const dueMonth =
     days.dueDay > days.cutDay
@@ -78,7 +89,7 @@ function getDebtAtCut(
   records: StatementRecord[],
 ): Cents | null {
   const record = records.find((item) => item.cutDate === cutDate);
-  if (record) return record.statementAmount;
+  if (record && record.statementAmount !== null) return record.statementAmount;
 
   const cardOpening = getOpeningDates(movements).tarjetaNu;
   if (cardOpening && cutDate < cardOpening) return null;
@@ -95,7 +106,7 @@ export function getCardStatus(
 ): CardStatus {
   const debt = getCardDebt(movements, today);
   const lastCut = getLastClosedCut(today, days);
-  const lastDue = getDueDateForCut(lastCut, days);
+  const lastDue = getDueDateForCut(lastCut, days, records);
 
   if (today <= lastDue) {
     const statement = getDebtAtCut(movements, lastCut, records);
@@ -118,7 +129,7 @@ export function getCardStatus(
   }
 
   const nextCut = getCutForDate(today, days);
-  const nextDue = getDueDateForCut(nextCut, days);
+  const nextDue = getDueDateForCut(nextCut, days, records);
   const owed = Math.max(0, debt);
 
   return {

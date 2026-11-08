@@ -1,6 +1,6 @@
 import { getCutForDate, getDueDateForCut } from "./billing.ts";
 import { addDays, dateInMonth, formatShortDate, getYearMonth, shiftMonth } from "./dates.ts";
-import type { IsoDate, Movement, Settings } from "./types.ts";
+import type { IsoDate, Movement, Settings, StatementRecord } from "./types.ts";
 
 /**
  * A card period runs from one cut to the day before the next one (the 22nd to the 21st)
@@ -19,7 +19,11 @@ export interface Period {
 
 type BillingDays = Pick<Settings, "cutDay" | "dueDay">;
 
-export function getPeriodForDate(date: IsoDate, days: BillingDays): Period {
+export function getPeriodForDate(
+  date: IsoDate,
+  days: BillingDays,
+  statements: StatementRecord[] = [],
+): Period {
   const cutDate = getCutForDate(date, days);
   const { year, month } = getYearMonth(cutDate);
   const previous = shiftMonth(year, month, -1);
@@ -28,7 +32,7 @@ export function getPeriodForDate(date: IsoDate, days: BillingDays): Period {
     start: dateInMonth(previous.year, previous.month, days.cutDay),
     end: addDays(cutDate, -1),
     cutDate,
-    dueDate: getDueDateForCut(cutDate, days),
+    dueDate: getDueDateForCut(cutDate, days, statements),
   };
 }
 
@@ -50,14 +54,15 @@ export function getPeriodsWithData(
   movements: Movement[],
   settings: BillingDays,
   today: IsoDate,
+  statements: StatementRecord[] = [],
 ): Period[] {
-  const current = getPeriodForDate(today, settings);
+  const current = getPeriodForDate(today, settings, statements);
   const periods = new Map<IsoDate, Period>([[current.start, current]]);
 
   for (const movement of movements) {
-    if (movement.dataKind === "dummy" || movement.type === "adjustment") continue;
+    if (movement.type === "adjustment") continue;
     if (movement.date > today) continue;
-    const period = getPeriodForDate(movement.date, settings);
+    const period = getPeriodForDate(movement.date, settings, statements);
     if (!periods.has(period.start)) periods.set(period.start, period);
   }
 

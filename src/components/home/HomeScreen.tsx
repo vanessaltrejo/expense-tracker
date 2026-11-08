@@ -86,7 +86,7 @@ function FullHome() {
   const { data, dashboard, today, runAction, canEdit } = useFinance();
   const { balances } = dashboard;
   const pending = data.movements.filter(
-    (movement) => movement.dataKind !== "dummy" && movement.category === PENDING_CATEGORY,
+    (movement) => movement.category === PENDING_CATEGORY,
   );
 
   return (

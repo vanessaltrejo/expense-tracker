@@ -23,8 +23,12 @@ export type MovementType =
   | "transfer"
   | "adjustment";
 
-/** real: counts everywhere. dummy: placeholder, counts nowhere. */
-export type DataKind = "real" | "dummy";
+/**
+ * real: counts everywhere.
+ * previo: really happened before the app, so it is already inside the opening balances: it
+ * counts in summaries and in the Sheet's views, but never moves a balance or the card debt.
+ */
+export type DataKind = "real" | "previo";
 
 export interface Movement {
   id: string;
@@ -68,10 +72,15 @@ export interface ExpectedCharge {
   status: ExpectedChargeStatus;
 }
 
+/**
+ * One row of Cortes. The due date wins over the usual day of Ajustes, for the months when Nu
+ * moves it. The amount can be left empty while the statement isn't out yet: the app then
+ * keeps calculating it.
+ */
 export interface StatementRecord {
   cutDate: IsoDate;
   dueDate: IsoDate;
-  statementAmount: Cents;
+  statementAmount: Cents | null;
 }
 
 export interface Shortcut {

@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable, type Transaction } from "dexie";
 
 import { emptyPaymentPlan, seedSettings } from "@/data/seedData";
-import { createId } from "@/domain/ids";
+import { createMovementId, createShortcutId } from "@/domain/ids";
 import type { SyncOp } from "@/domain/syncOps";
 import type {
   AppData,
@@ -23,10 +23,13 @@ export interface FinanceRepository {
   load(): Promise<AppData>;
   /** A draft may bring its own ID, for parts of a breakdown that are named after their parent. */
   addMovements(drafts: (MovementDraft & { id?: string })[]): Promise<Movement[]>;
-  restoreMovements(movements: Movement[]): Promise<void>;
+  /** Saves these movements as they are: for undoing a delete and for editing a movement with its parts. */
+  saveMovements(movements: Movement[]): Promise<void>;
   deleteMovements(ids: string[]): Promise<void>;
   updateMovement(movement: Movement): Promise<void>;
   saveExpectedCharges(charges: ExpectedCharge[]): Promise<void>;
+  /** For generated charges the schedule no longer produces. */
+  deleteExpectedCharges(ids: string[]): Promise<void>;
   /** For charges the app generated: never overwrites one the sheet already has. */
   addGeneratedCharges(charges: ExpectedCharge[]): Promise<void>;
   saveShortcut(shortcut: Omit<Shortcut, "id"> & { id?: string }): Promise<Shortcut>;
@@ -52,8 +55,6 @@ interface ConfigRow {
   id: "main";
   settings: Settings;
   paymentPlan: PaymentPlan;
-  nextMovementId: number;
-  nextShortcutId: number;
   linkedAt?: string | null;
   lastSyncedAt?: string | null;
 }
@@ -120,8 +121,6 @@ class DexieFinanceRepository implements FinanceRepository {
       id: "main",
       settings: seedSettings,
       paymentPlan: emptyPaymentPlan,
-      nextMovementId: 1,
-      nextShortcutId: 1,
       linkedAt: null,
       lastSyncedAt: null,
     };
@@ -160,7 +159,7 @@ class DexieFinanceRepository implements FinanceRepository {
   }
 
   async addMovements(drafts: (MovementDraft & { id?: string })[]): Promise<Movement[]> {
-    const created = drafts.map((draft) => ({ ...draft, id: draft.id ?? createId("m") }));
+    const created = drafts.map((draft) => ({ ...draft, id: draft.id ?? createMovementId(draft.date) }));
     await this.change(async () => {
       await this.db.movements.bulkAdd(created);
       return { kind: "upsertMovements", movements: created };
@@ -168,7 +167,7 @@ class DexieFinanceRepository implements FinanceRepository {
     return created;
   }
 
-  async restoreMovements(movements: Movement[]): Promise<void> {
+  async saveMovements(movements: Movement[]): Promise<void> {
     await this.change(async () => {
       await this.db.movements.bulkPut(movements);
       return { kind: "upsertMovements", movements };
@@ -196,6 +195,13 @@ class DexieFinanceRepository implements FinanceRepository {
     });
   }
 
+  async deleteExpectedCharges(ids: string[]): Promise<void> {
+    await this.change(async () => {
+      await this.db.expectedCharges.bulkDelete(ids);
+      return { kind: "deleteExpectedCharges", ids };
+    });
+  }
+
   async addGeneratedCharges(charges: ExpectedCharge[]): Promise<void> {
     await this.change(async () => {
       await this.db.expectedCharges.bulkPut(charges);
@@ -206,7 +212,7 @@ class DexieFinanceRepository implements FinanceRepository {
   async saveShortcut(
     shortcut: Omit<Shortcut, "id"> & { id?: string },
   ): Promise<Shortcut> {
-    const saved: Shortcut = { ...shortcut, id: shortcut.id ?? createId("s") };
+    const saved: Shortcut = { ...shortcut, id: shortcut.id ?? createShortcutId() };
     await this.change(async () => {
       await this.db.shortcuts.put(saved);
       return { kind: "upsertShortcut", shortcut: saved };
@@ -284,6 +290,9 @@ async function applyLocally(tx: Transaction, op: SyncOp): Promise<void> {
       break;
     case "upsertExpectedCharges":
       await tx.table<ExpectedCharge, string>("expectedCharges").bulkPut(op.charges);
+      break;
+    case "deleteExpectedCharges":
+      await tx.table<ExpectedCharge, string>("expectedCharges").bulkDelete(op.ids);
       break;
     case "addExpectedCharges": {
       // Same rule as the sheet: only fill in charges that aren't there yet.

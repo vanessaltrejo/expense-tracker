@@ -60,6 +60,27 @@ export function generateExpectedCharges(
   return [...existing, ...created];
 }
 
+/**
+ * Future charges the schedule no longer produces: an iCloud charge on the 27th that was
+ * generated before its day became the 6th. They are removed, and the right ones are made.
+ * A charge whose date was moved by hand (its ID keeps the scheduled date) is never touched,
+ * because choosing a different day for one payment is something she does on purpose.
+ */
+export function findStaleCharges(
+  expenses: FixedExpense[],
+  charges: ExpectedCharge[],
+  today: IsoDate,
+): ExpectedCharge[] {
+  return charges.filter((charge) => {
+    if (charge.status !== "expected" || charge.date < today) return false;
+    if (charge.id !== `${charge.fixedExpenseId}:${charge.date}`) return false;
+    const expense = expenses.find((item) => item.id === charge.fixedExpenseId);
+    if (!expense || !expense.active) return false;
+    const { year, month } = getYearMonth(charge.date);
+    return getChargeDateInMonth(expense, year, month) !== charge.date;
+  });
+}
+
 export function isOverdue(charge: ExpectedCharge, today: IsoDate): boolean {
   return charge.status === "expected" && charge.date < today;
 }

@@ -28,7 +28,7 @@ export function getHistoryCategories(movements: Movement[]): HistoryCategories {
   const income = new Set<string>();
 
   for (const movement of movements) {
-    if (!movement.category || movement.dataKind === "dummy") continue;
+    if (!movement.category) continue;
     if (matchesKind(movement, "expenses")) expenses.add(movement.category);
     if (matchesKind(movement, "income")) income.add(movement.category);
   }

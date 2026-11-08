@@ -36,7 +36,7 @@ export function PeriodBar({
           aria-expanded={canPick ? isOpen : undefined}
           aria-controls="period-list"
           aria-label={`${isSimple ? "Mes" : "Periodo"}: ${formatPeriodRange(period)}`}
-          className="flex h-14 min-w-40 shrink-0 items-center justify-between gap-3 rounded-2xl bg-surface px-4 text-right active:opacity-80"
+          className="flex h-14 shrink-0 items-center justify-between gap-3 rounded-2xl bg-surface px-4 text-right active:opacity-80"
           onClick={() => canPick && setIsOpen(!isOpen)}
         >
           <span className="flex flex-col items-end gap-0.5 leading-snug">

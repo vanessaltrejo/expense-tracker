@@ -1,3 +1,12 @@
+import {
+  type Cell,
+  type ColumnMap,
+  type ColumnSpec,
+  cellText as text,
+  findColumns,
+  findHeader,
+  type SheetRow,
+} from "./sheetColumns.ts";
 import { ENDPOINT_LABELS } from "./ledger.ts";
 import type {
   Cents,
@@ -20,8 +29,7 @@ import type {
  * The sheet uses Spanish labels and pesos; the app uses codes and centavos.
  */
 
-export type Cell = string | number | boolean | null | undefined;
-export type SheetRow = Cell[];
+export type { Cell, SheetRow } from "./sheetColumns.ts";
 
 export interface RowIssue {
   tab: string;
@@ -39,7 +47,7 @@ const TYPE_LABELS: Record<MovementType, string> = {
 
 const DATA_KIND_LABELS: Record<DataKind, string> = {
   real: "Real",
-  dummy: "Dummy",
+  previo: "Previo",
 };
 
 const STATUS_LABELS: Record<ExpectedChargeStatus, string> = {
@@ -69,11 +77,6 @@ const FREQUENCY_BY_LABEL = invert(FREQUENCY_LABELS);
 
 const SHEETS_EPOCH_MS = Date.UTC(1899, 11, 30);
 const MS_PER_DAY = 86_400_000;
-
-function text(cell: Cell): string {
-  if (cell === null || cell === undefined) return "";
-  return String(cell).trim();
-}
 
 /** Sheets stores dates as days since 1899-12-30; typed text dates are accepted too. */
 export function cellToIsoDate(cell: Cell): IsoDate | null {
@@ -117,18 +120,62 @@ function endpointLabel(endpoint: MovementEndpoint | null): string {
   return endpoint ? ENDPOINT_LABELS[endpoint] : "";
 }
 
-/** Unchecked checkboxes come back as false, so a row of only those is still empty. */
-function isEmptyRow(row: SheetRow): boolean {
-  return row.every((cell) => cell === false || text(cell) === "");
+/**
+ * A row with nothing in the columns the app reads. Unchecked checkboxes come back as false,
+ * so a row of only those is still empty, and so is a row that only has the person's own notes.
+ */
+function isEmptyRow(row: SheetRow, columns: ColumnMap<string>): boolean {
+  return Object.values<number>(columns).every((index) => {
+    const cell = row[index];
+    return cell === false || text(cell) === "";
+  });
 }
 
 type Parsed<T> = { value: T } | { issue: string } | { empty: true };
 
-// ---------- Movimientos: ID | Fecha | Tipo | Monto | De | A | Categoría | Nota | Dato
+/**
+ * One tab of the Sheet: its name, the columns the app needs (found by header) and how a
+ * row is read. Writing goes through the same column map, so it never depends on position.
+ */
+export interface Table<K extends string, T = unknown> {
+  tab: string;
+  columns: readonly ColumnSpec<K>[];
+  parse: (row: SheetRow, columns: ColumnMap<K>) => Parsed<T>;
+}
 
-export function parseMovementRow(row: SheetRow): Parsed<Omit<Movement, "id"> & { id: string }> {
-  if (isEmptyRow(row)) return { empty: true };
-  const [id, date, type, amount, from, to, category, note, dataKind] = row;
+// ---------- Movimientos
+
+const MOVEMENT_COLUMNS = [
+  { key: "id", header: "ID" },
+  { key: "date", header: "Fecha" },
+  { key: "type", header: "Tipo" },
+  { key: "amount", header: "Monto" },
+  { key: "from", header: "De" },
+  { key: "to", header: "A" },
+  { key: "category", header: "Categoría" },
+  { key: "note", header: "Nota" },
+  { key: "dataKind", header: "Dato" },
+] as const;
+
+export type MovementColumn = (typeof MOVEMENT_COLUMNS)[number]["key"];
+
+export function parseMovementRow(
+  row: SheetRow,
+  columns: ColumnMap<MovementColumn>,
+): Parsed<Movement> {
+  if (isEmptyRow(row, columns)) return { empty: true };
+  const cell = (key: MovementColumn): Cell => row[columns[key]];
+  const [id, date, type, amount, from, to, category, note, dataKind] = [
+    cell("id"),
+    cell("date"),
+    cell("type"),
+    cell("amount"),
+    cell("from"),
+    cell("to"),
+    cell("category"),
+    cell("note"),
+    cell("dataKind"),
+  ];
 
   const parsedDate = cellToIsoDate(date);
   if (!parsedDate) return { issue: "La fecha no es válida" };
@@ -160,25 +207,61 @@ export function parseMovementRow(row: SheetRow): Parsed<Omit<Movement, "id"> & {
   };
 }
 
-export function movementToRow(movement: Movement): Cell[] {
-  return [
-    movement.id,
-    movement.date,
-    TYPE_LABELS[movement.type],
-    centsToPesos(movement.amount),
-    endpointLabel(movement.from),
-    endpointLabel(movement.to),
-    movement.category ?? "",
-    movement.note,
-    DATA_KIND_LABELS[movement.dataKind],
-  ];
+export function movementToRecord(movement: Movement): Record<MovementColumn, Cell> {
+  return {
+    id: movement.id,
+    date: movement.date,
+    type: TYPE_LABELS[movement.type],
+    amount: centsToPesos(movement.amount),
+    from: endpointLabel(movement.from),
+    to: endpointLabel(movement.to),
+    category: movement.category ?? "",
+    note: movement.note,
+    dataKind: DATA_KIND_LABELS[movement.dataKind],
+  };
 }
 
-// ---------- Gastos fijos (the app only reads): ID | Nombre | Monto normal | Frecuencia | Día | Mes | Categoría | Desde | Hasta | Activo
+export const MOVEMENTS_TABLE: Table<MovementColumn, Movement> = {
+  tab: "Movimientos",
+  columns: MOVEMENT_COLUMNS,
+  parse: parseMovementRow,
+};
 
-export function parseFixedExpenseRow(row: SheetRow): Parsed<FixedExpense> {
-  if (isEmptyRow(row)) return { empty: true };
-  const [id, name, amount, frequency, day, month, category, start, end, active] = row;
+// ---------- Gastos fijos (the app only reads)
+
+const FIXED_EXPENSE_COLUMNS = [
+  { key: "id", header: "ID" },
+  { key: "name", header: "Nombre" },
+  { key: "amount", header: "Monto normal" },
+  { key: "frequency", header: "Frecuencia" },
+  { key: "day", header: "Día" },
+  { key: "month", header: "Mes" },
+  { key: "category", header: "Categoría" },
+  { key: "start", header: "Desde" },
+  { key: "end", header: "Hasta" },
+  { key: "active", header: "Activo" },
+] as const;
+
+export type FixedExpenseColumn = (typeof FIXED_EXPENSE_COLUMNS)[number]["key"];
+
+export function parseFixedExpenseRow(
+  row: SheetRow,
+  columns: ColumnMap<FixedExpenseColumn>,
+): Parsed<FixedExpense> {
+  if (isEmptyRow(row, columns)) return { empty: true };
+  const cell = (key: FixedExpenseColumn): Cell => row[columns[key]];
+  const [id, name, amount, frequency, day, month, category, start, end, active] = [
+    cell("id"),
+    cell("name"),
+    cell("amount"),
+    cell("frequency"),
+    cell("day"),
+    cell("month"),
+    cell("category"),
+    cell("start"),
+    cell("end"),
+    cell("active"),
+  ];
 
   const normalAmount = cellToCents(amount);
   if (!text(id) || !text(name) || normalAmount === null) {
@@ -213,11 +296,41 @@ export function parseFixedExpenseRow(row: SheetRow): Parsed<FixedExpense> {
   };
 }
 
-// ---------- Pagos esperados: ID | Gasto fijo | Nombre | Fecha | Monto | Categoría | Estado
+export const FIXED_EXPENSES_TABLE: Table<FixedExpenseColumn, FixedExpense> = {
+  tab: "Gastos fijos",
+  columns: FIXED_EXPENSE_COLUMNS,
+  parse: parseFixedExpenseRow,
+};
 
-export function parseExpectedChargeRow(row: SheetRow): Parsed<ExpectedCharge> {
-  if (isEmptyRow(row)) return { empty: true };
-  const [id, fixedExpenseId, name, date, amount, category, status] = row;
+// ---------- Pagos esperados
+
+const EXPECTED_CHARGE_COLUMNS = [
+  { key: "id", header: "ID" },
+  { key: "fixedExpenseId", header: "Gasto fijo" },
+  { key: "name", header: "Nombre" },
+  { key: "date", header: "Fecha" },
+  { key: "amount", header: "Monto" },
+  { key: "category", header: "Categoría" },
+  { key: "status", header: "Estado" },
+] as const;
+
+export type ExpectedChargeColumn = (typeof EXPECTED_CHARGE_COLUMNS)[number]["key"];
+
+export function parseExpectedChargeRow(
+  row: SheetRow,
+  columns: ColumnMap<ExpectedChargeColumn>,
+): Parsed<ExpectedCharge> {
+  if (isEmptyRow(row, columns)) return { empty: true };
+  const cell = (key: ExpectedChargeColumn): Cell => row[columns[key]];
+  const [id, fixedExpenseId, name, date, amount, category, status] = [
+    cell("id"),
+    cell("fixedExpenseId"),
+    cell("name"),
+    cell("date"),
+    cell("amount"),
+    cell("category"),
+    cell("status"),
+  ];
   const parsedDate = cellToIsoDate(date);
   const parsedAmount = cellToCents(amount);
   const parsedStatus = STATUS_BY_LABEL.get(text(status).toLowerCase());
@@ -237,37 +350,83 @@ export function parseExpectedChargeRow(row: SheetRow): Parsed<ExpectedCharge> {
   };
 }
 
-export function expectedChargeToRow(charge: ExpectedCharge): Cell[] {
-  return [
-    charge.id,
-    charge.fixedExpenseId,
-    charge.name,
-    charge.date,
-    centsToPesos(charge.amount),
-    charge.category,
-    STATUS_LABELS[charge.status],
-  ];
+export function expectedChargeToRecord(
+  charge: ExpectedCharge,
+): Record<ExpectedChargeColumn, Cell> {
+  return {
+    id: charge.id,
+    fixedExpenseId: charge.fixedExpenseId,
+    name: charge.name,
+    date: charge.date,
+    amount: centsToPesos(charge.amount),
+    category: charge.category,
+    status: STATUS_LABELS[charge.status],
+  };
 }
 
-// ---------- Cortes: Fecha de corte | Fecha límite | Estado de cuenta (the app only reads)
+export const EXPECTED_CHARGES_TABLE: Table<ExpectedChargeColumn, ExpectedCharge> = {
+  tab: "Pagos esperados",
+  columns: EXPECTED_CHARGE_COLUMNS,
+  parse: parseExpectedChargeRow,
+};
 
-export function parseStatementRow(row: SheetRow): Parsed<StatementRecord> {
-  if (isEmptyRow(row)) return { empty: true };
-  const [cut, due, amount] = row;
+// ---------- Cortes (the app only reads)
+
+const STATEMENT_COLUMNS = [
+  { key: "cut", header: "Fecha de corte" },
+  { key: "due", header: "Fecha límite" },
+  { key: "amount", header: "Estado de cuenta" },
+] as const;
+
+export type StatementColumn = (typeof STATEMENT_COLUMNS)[number]["key"];
+
+export function parseStatementRow(
+  row: SheetRow,
+  columns: ColumnMap<StatementColumn>,
+): Parsed<StatementRecord> {
+  if (isEmptyRow(row, columns)) return { empty: true };
+  const [cut, due, amount] = [row[columns.cut], row[columns.due], row[columns.amount]];
   const cutDate = cellToIsoDate(cut);
   const dueDate = cellToIsoDate(due);
-  const statementAmount = cellToCents(amount);
-  if (!cutDate || !dueDate || statementAmount === null) {
-    return { issue: "Falta la fecha de corte, la fecha límite o el monto" };
+  // An empty amount is fine: the statement isn't out yet and the app keeps calculating it.
+  const statementAmount = text(amount) === "" ? null : cellToCents(amount);
+  if (!cutDate || !dueDate || (statementAmount === null && text(amount) !== "")) {
+    return { issue: "Falta la fecha de corte o la fecha límite, o el monto no es un número" };
   }
   return { value: { cutDate, dueDate, statementAmount } };
 }
 
-// ---------- Atajos: ID | Nombre | Monto | Categoría | Se paga con
+export const STATEMENTS_TABLE: Table<StatementColumn, StatementRecord> = {
+  tab: "Cortes",
+  columns: STATEMENT_COLUMNS,
+  parse: parseStatementRow,
+};
 
-export function parseShortcutRow(row: SheetRow): Parsed<Shortcut> {
-  if (isEmptyRow(row)) return { empty: true };
-  const [id, name, amount, category, paidFrom] = row;
+// ---------- Atajos
+
+const SHORTCUT_COLUMNS = [
+  { key: "id", header: "ID" },
+  { key: "name", header: "Nombre" },
+  { key: "amount", header: "Monto" },
+  { key: "category", header: "Categoría" },
+  { key: "paidFrom", header: "Se paga con" },
+] as const;
+
+export type ShortcutColumn = (typeof SHORTCUT_COLUMNS)[number]["key"];
+
+export function parseShortcutRow(
+  row: SheetRow,
+  columns: ColumnMap<ShortcutColumn>,
+): Parsed<Shortcut> {
+  if (isEmptyRow(row, columns)) return { empty: true };
+  const cell = (key: ShortcutColumn): Cell => row[columns[key]];
+  const [id, name, amount, category, paidFrom] = [
+    cell("id"),
+    cell("name"),
+    cell("amount"),
+    cell("category"),
+    cell("paidFrom"),
+  ];
   const endpoint = endpointFromCell(paidFrom);
   if (!text(id) || !text(name) || !endpoint) {
     return { issue: "Falta el ID, el nombre o con qué se paga" };
@@ -283,69 +442,153 @@ export function parseShortcutRow(row: SheetRow): Parsed<Shortcut> {
   };
 }
 
-export function shortcutToRow(shortcut: Shortcut): Cell[] {
-  return [
-    shortcut.id,
-    shortcut.name,
-    shortcut.amount === null ? "" : centsToPesos(shortcut.amount),
-    shortcut.category,
-    ENDPOINT_LABELS[shortcut.paidFrom],
-  ];
+export function shortcutToRecord(shortcut: Shortcut): Record<ShortcutColumn, Cell> {
+  return {
+    id: shortcut.id,
+    name: shortcut.name,
+    amount: shortcut.amount === null ? "" : centsToPesos(shortcut.amount),
+    category: shortcut.category,
+    paidFrom: ENDPOINT_LABELS[shortcut.paidFrom],
+  };
 }
 
-// ---------- Ajustes: values in B2:B6, lists in E (gasto), F (ingreso), L (lugares), M (categorías con lugar), N (dónde sale cada lugar)
+export const SHORTCUTS_TABLE: Table<ShortcutColumn, Shortcut> = {
+  tab: "Atajos",
+  columns: SHORTCUT_COLUMNS,
+  parse: parseShortcutRow,
+};
 
-/** Rows of the Ajustes tab, starting at row 1 (the header). */
+// ---------- Ajustes: settings by their name, lists by the name in the header row
+
+const SETTINGS_COLUMNS = [
+  { key: "name", header: "Ajuste" },
+  { key: "value", header: "Valor" },
+] as const;
+
+/** The settings, found by the start of their name (the row where each lives can move). */
+const SETTING_LABELS = {
+  cardLimit: "límite de la tarjeta",
+  cutDay: "día de corte",
+  dueDay: "día límite de pago",
+  yieldRate: "tasa anual",
+  paymentDay: "día de pago",
+} as const;
+
+export type SettingName = keyof typeof SETTING_LABELS;
+
+/** The 1-based row of a setting, or null when the tab has no setting with that name. */
+export function findSettingRow(rows: SheetRow[], setting: SettingName, nameColumn = 0): number | null {
+  const index = rows.findIndex((row) =>
+    text(row[nameColumn]).toLowerCase().startsWith(SETTING_LABELS[setting]),
+  );
+  return index >= 0 ? index + 1 : null;
+}
+
+/** Where the settings and their values are, from the header row of Ajustes. */
+export function findSettingsColumns(rows: SheetRow[]): ColumnMap<(typeof SETTINGS_COLUMNS)[number]["key"]> {
+  return findColumns("Ajustes", rows[0], SETTINGS_COLUMNS);
+}
+
+/**
+ * Rows of the Ajustes tab, starting at row 1 (the header). Every list and setting is found
+ * by name, so deleting or moving columns and rows can't confuse the app. What isn't there
+ * simply isn't set: the app's defaults fill in, nothing is guessed from a position.
+ */
 export function parseSettings(
   rows: SheetRow[],
   fallback: Settings,
 ): { settings: Settings; plan: PaymentPlan } {
-  const value = (rowNumber: number): Cell => rows[rowNumber - 1]?.[1];
-  const column = (index: number): string[] =>
-    rows
+  const header = rows[0];
+  const settingsColumns = findSettingsColumns(rows);
+  const value = (setting: SettingName): Cell => {
+    const row = findSettingRow(rows, setting, settingsColumns.name);
+    return row === null ? undefined : rows[row - 1]?.[settingsColumns.value];
+  };
+  const column = (name: string): string[] => {
+    const index = findHeader(header, name);
+    if (index < 0) return [];
+    return rows
       .slice(1)
       .map((row) => text(row[index]))
       .filter((item) => item !== "");
+  };
 
-  const expenseCategories = column(4);
-  const incomeCategories = column(5);
-  // Columns L, M and N exist only in the simple layout's Sheet; elsewhere they stay empty.
-  // N says in which categories (separated by commas) the place on its row is offered.
+  const expenseCategories = column("Categorías de gasto");
+  const incomeCategories = column("Categorías de ingreso");
+  // The place lists exist only in the simple layout's Sheet; elsewhere they stay empty.
+  // "Dónde sale cada lugar" says in which categories (separated by commas) a place is offered.
+  const placeColumn = findHeader(header, "Lugares frecuentes");
+  const placeScopeColumn = findHeader(header, "Dónde sale cada lugar");
   const places: string[] = [];
   const placeScopes: Record<string, string[]> = {};
-  for (const row of rows.slice(1)) {
-    const place = text(row[11]);
-    if (place === "") continue;
-    places.push(place);
-    const scope = text(row[13])
-      .split(",")
-      .map((item) => item.trim())
-      .filter((item) => item !== "");
-    if (scope.length > 0) placeScopes[place.toLowerCase()] = scope;
+  if (placeColumn >= 0) {
+    for (const row of rows.slice(1)) {
+      const place = text(row[placeColumn]);
+      if (place === "") continue;
+      places.push(place);
+      const scope =
+        placeScopeColumn < 0
+          ? []
+          : text(row[placeScopeColumn])
+              .split(",")
+              .map((item) => item.trim())
+              .filter((item) => item !== "");
+      if (scope.length > 0) placeScopes[place.toLowerCase()] = scope;
+    }
   }
-  const placeCategories = column(12);
 
   return {
     settings: {
-      cardLimit: cellToCents(value(2)) ?? fallback.cardLimit,
-      cutDay: cellToInteger(value(3)) ?? fallback.cutDay,
-      dueDay: cellToInteger(value(4)) ?? fallback.dueDay,
+      cardLimit: cellToCents(value("cardLimit")) ?? fallback.cardLimit,
+      cutDay: cellToInteger(value("cutDay")) ?? fallback.cutDay,
+      dueDay: cellToInteger(value("dueDay")) ?? fallback.dueDay,
       annualYieldRate:
-        typeof value(5) === "number" ? (value(5) as number) : fallback.annualYieldRate,
+        typeof value("yieldRate") === "number"
+          ? (value("yieldRate") as number)
+          : fallback.annualYieldRate,
       expenseCategories:
         expenseCategories.length > 0 ? expenseCategories : fallback.expenseCategories,
       incomeCategories:
         incomeCategories.length > 0 ? incomeCategories : fallback.incomeCategories,
       places,
-      placeCategories,
+      placeCategories: column("Categorías con lugar"),
       placeScopes,
     },
-    plan: { plannedDate: cellToIsoDate(value(6)) },
+    plan: { plannedDate: cellToIsoDate(value("paymentDay")) },
   };
 }
 
 export function paymentPlanToCells(plan: PaymentPlan): Cell[][] {
   return [[plan.plannedDate ?? ""]];
+}
+
+/**
+ * A row whose ID already showed up above is left out and reported. The app keeps one entry
+ * per ID, so the copy would be hidden in the app but still counted in the Sheet's own tabs.
+ * Rows with no ID yet are skipped here: they get one when the Sheet is read.
+ */
+export function dropDuplicateIds<T extends { id: string }>(
+  parsed: { items: T[]; issues: RowIssue[]; rowNumbers: number[] },
+  tab: string,
+): { items: T[]; issues: RowIssue[]; rowNumbers: number[] } {
+  const seen = new Map<string, number>();
+  const items: T[] = [];
+  const rowNumbers: number[] = [];
+  const issues = [...parsed.issues];
+
+  parsed.items.forEach((item, index) => {
+    const rowNumber = parsed.rowNumbers[index];
+    const firstRow = item.id === "" ? undefined : seen.get(item.id);
+    if (firstRow !== undefined) {
+      issues.push({ tab, row: rowNumber, reason: `El ID "${item.id}" ya está en la fila ${firstRow}` });
+      return;
+    }
+    if (item.id !== "") seen.set(item.id, rowNumber);
+    items.push(item);
+    rowNumbers.push(rowNumber);
+  });
+
+  return { items, issues, rowNumbers };
 }
 
 /** Parses every row of a tab, collecting the rows that can't be read instead of failing. */
@@ -371,4 +614,17 @@ export function parseRows<T>(
   });
 
   return { items, issues, rowNumbers };
+}
+
+/**
+ * Reads a whole tab as it comes from the Sheet: the header row first, then the data rows.
+ * Throws SheetLayoutError when a column the app needs is not in the header.
+ */
+export function readTable<K extends string, T>(
+  rows: SheetRow[],
+  table: Table<K, T>,
+): { items: T[]; issues: RowIssue[]; rowNumbers: number[]; columns: ColumnMap<K> } {
+  const columns = findColumns(table.tab, rows[0], table.columns);
+  const parsed = parseRows(rows.slice(1), (row) => table.parse(row, columns), table.tab, 2);
+  return { ...parsed, columns };
 }

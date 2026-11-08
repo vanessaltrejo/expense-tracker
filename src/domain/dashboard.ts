@@ -95,7 +95,7 @@ function buildPlanView(plan: PaymentPlan, dueDate: IsoDate, today: IsoDate): Pla
 
 export function buildDashboard(data: AppData, today: IsoDate): Dashboard {
   const { movements, settings, statements, expectedCharges } = data;
-  const period = getPeriodForDate(today, settings);
+  const period = getPeriodForDate(today, settings, statements);
   const balances = getLedgerBalances(movements, today, settings.annualYieldRate);
 
   const realMoney = balances.cajita + balances.banorte + balances.efectivo;
@@ -185,14 +185,11 @@ function isSpending(movement: Movement): boolean {
 export function buildPeriodSummary(
   data: AppData,
   today: IsoDate,
-  period: Period = getPeriodForDate(today, data.settings),
+  period: Period = getPeriodForDate(today, data.settings, data.statements),
 ): PeriodSummary {
   // Rows older than an opening balance still count here: only balances ignore them.
   const inPeriod = data.movements.filter(
-    (movement) =>
-      movement.dataKind !== "dummy" &&
-      movement.date <= today &&
-      isInPeriod(movement.date, period),
+    (movement) => movement.date <= today && isInPeriod(movement.date, period),
   );
 
   const spending = inPeriod.filter(isSpending);

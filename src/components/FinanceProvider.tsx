@@ -155,11 +155,12 @@ export function FinanceProvider({
 
   const value = useMemo<FinanceContextValue | null>(() => {
     if (!loaded) return null;
-    const periods = getPeriodsWithData(loaded.data.movements, loaded.data.settings, loaded.today);
+    const { movements, settings, statements } = loaded.data;
+    const periods = getPeriodsWithData(movements, settings, loaded.today, statements);
     // A period that no longer has data (rows deleted) falls back to the current one.
     const viewPeriod =
       periods.find((period) => period.start === viewStart) ??
-      getPeriodForDate(loaded.today, loaded.data.settings);
+      getPeriodForDate(loaded.today, settings, statements);
     return {
       data: loaded.data,
       today: loaded.today,

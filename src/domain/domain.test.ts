@@ -18,11 +18,12 @@ import {
   isMomDebtEntry,
   OPENING_BALANCE_CATEGORY,
 } from "./ledger.ts";
-import { parseMoneyInput, pesos } from "./money.ts";
+import { centsToInput, parseMoneyInput, pesos } from "./money.ts";
 import { getLoanBalances, LOAN_CATEGORY, personOf } from "./loans.ts";
 import { getBreakdowns, parentIdOf } from "./breakdown.ts";
+import { createMovementId, createShortcutId } from "./ids.ts";
 import { getFrequentPlaces, getSentToPeople, getTopPlaces, placeOfNote } from "./places.ts";
-import { generateExpectedCharges } from "./recurring.ts";
+import { findStaleCharges, generateExpectedCharges } from "./recurring.ts";
 import type {
   AppData,
   FixedExpense,
@@ -304,10 +305,9 @@ describe("earlier periods with data", () => {
     assert.deepEqual(periods.map((period) => period.start), ["2026-11-01", "2026-10-01", "2026-08-01"]);
   });
 
-  test("an opening balance alone, a dummy row or a future row don't open a period", () => {
+  test("an opening balance alone or a future row don't open a period", () => {
     const movements = [
       opening("bbva", 30, "2026-09-10"),
-      row({ date: "2026-10-05", type: "expense", amount: pesos(10), from: "bbva", dataKind: "dummy" }),
       row({ date: "2026-12-05", type: "expense", amount: pesos(10), from: "bbva" }),
     ];
     assert.deepEqual(getPeriodsWithData(movements, monthly, "2026-11-06").map((period) => period.start), ["2026-11-01"]);
@@ -446,7 +446,27 @@ describe("day headers", () => {
   });
 });
 
+describe("IDs", () => {
+  test("a movement ID starts with its day, so the Sheet reads in order", () => {
+    const id = createMovementId("2026-11-08");
+    assert.match(id, /^261108-[0-9a-z]{4}$/);
+    assert.notEqual(id, createMovementId("2026-11-08"));
+    assert.match(createShortcutId(), /^s[0-9a-z]{4}$/);
+  });
+
+  test("the part of a breakdown still finds its movement", () => {
+    assert.equal(parentIdOf("261108-k3f9.2"), "261108-k3f9");
+    assert.equal(parentIdOf("261108-k3f9"), null);
+  });
+});
+
 describe("money", () => {
+  test("an amount goes into a field and reads back the same", () => {
+    assert.equal(centsToInput(pesos(143.99)), "143.99");
+    assert.equal(centsToInput(pesos(5_000)), "5000.00");
+    assert.equal(parseMoneyInput(centsToInput(pesos(1_307.06))), pesos(1_307.06));
+  });
+
   test("reads typed amounts exactly", () => {
     assert.equal(parseMoneyInput("99"), 9_900);
     assert.equal(parseMoneyInput("$1,000.50"), 100_050);
@@ -470,12 +490,12 @@ describe("dates", () => {
 });
 
 describe("balances", () => {
-  test("dummy rows and rows before the opening balance don't move saldos", () => {
+  test("previo rows and rows before the opening balance don't move saldos", () => {
     const balances = getLedgerBalances(
       [
         opening("cajita", 1_000),
         row({ date: "2026-10-20", type: "transfer", amount: pesos(500), from: "cajita", to: "banorte" }),
-        row({ date: "2026-11-02", type: "income", amount: pesos(300), to: "cajita", dataKind: "dummy" }),
+        row({ date: "2026-11-02", type: "income", amount: pesos(300), to: "cajita", dataKind: "previo" }),
         row({ date: "2026-11-02", type: "income", amount: pesos(100), to: "cajita" }),
       ],
       "2026-11-03",
@@ -727,6 +747,73 @@ describe("expected charges", () => {
     assert.ok(!ids.some((id) => id.startsWith("parallels")));
     assert.ok(generateExpectedCharges(fixedExpenses, [], "2027-05-01").some((c) => c.id === "parallels:2027-05-26"));
   });
+});
+
+describe("due date of one cut", () => {
+  const moved = [{ cutDate: "2026-11-22", dueDate: "2026-12-03", statementAmount: null }];
+
+  test("a row in Cortes moves the due date of that cut only", () => {
+    assert.equal(getDueDateForCut("2026-11-22", settings, moved), "2026-12-03");
+    assert.equal(getDueDateForCut("2026-12-22", settings, moved), "2027-01-01");
+    assert.equal(getPeriodForDate("2026-11-10", settings, moved).dueDate, "2026-12-03");
+    assert.equal(getPeriodForDate("2026-11-30", settings, moved).dueDate, "2027-01-01");
+  });
+
+  test("an empty statement amount keeps the app calculating the debt", () => {
+    const movements = [row({ date: "2026-11-10", type: "cardExpense", amount: pesos(300), from: "tarjetaNu" })];
+    const status = getCardStatus(movements, moved, settings, "2026-11-25");
+    assert.equal(status.dueDate, "2026-12-03");
+    assert.equal(status.statementAmount, pesos(300));
+    // Still open the day after the usual due date, because Nu moved it.
+    assert.equal(getCardStatus(movements, moved, settings, "2026-12-02").phase, "closed");
+  });
+});
+
+describe("Previo: real, but from before the app", () => {
+  test("it counts in the summary and never moves balances or the card debt", () => {
+    const movements = [
+      opening("cajita", 1_000),
+      row({ date: "2026-11-02", type: "cardExpense", amount: pesos(1_138), from: "tarjetaNu", category: "suscripciones", note: "Parallels", dataKind: "previo" }),
+    ];
+    assert.equal(getLedgerBalances(movements, "2026-11-03").tarjetaNu, 0);
+    const summary = buildPeriodSummary(appData(movements), "2026-11-03");
+    assert.equal(summary.totalSpent, pesos(1_138));
+  });
+});
+
+describe("charges that move", () => {
+  const icloud = (id: string, date: string, status: "expected" | "charged" = "expected") => ({
+    id,
+    fixedExpenseId: "icloud",
+    name: "iCloud",
+    date,
+    amount: pesos(179),
+    category: "suscripciones",
+    status,
+  });
+  const dayChanged = fixedExpenses.map((expense) =>
+    expense.id === "icloud" ? { ...expense, schedule: { kind: "monthly" as const, dayOfMonth: 6 } } : expense,
+  );
+
+  test("future charges on the old day are stale, but one moved by hand is kept", () => {
+    const charges = [
+      icloud("icloud:2026-11-27", "2026-11-27"),
+      icloud("icloud:2026-12-06", "2026-12-06"),
+      icloud("icloud:2026-12-06b", "2026-12-09"),
+      // Scheduled for the 6th and moved to the 9th on purpose: the ID keeps the scheduled day.
+      icloud("icloud:2026-12-06", "2026-12-09"),
+    ];
+    assert.deepEqual(
+      findStaleCharges(dayChanged, charges, "2026-11-08").map((charge) => charge.id),
+      ["icloud:2026-11-27"],
+    );
+  });
+
+  test("a charge already confirmed or already past is never stale", () => {
+    const charges = [icloud("icloud:2026-11-27", "2026-11-27", "charged"), icloud("icloud:2026-10-27", "2026-10-27")];
+    assert.deepEqual(findStaleCharges(dayChanged, charges, "2026-11-08"), []);
+  });
+
 });
 
 describe("yield", () => {

@@ -137,13 +137,19 @@ export function MovementForm({ kind }: { kind: MovementFormKind }) {
 
   const noteField = (
     <label className="field-label">
-      {asksForPlace ? "Lugar (o escribe otro)" : isSimple ? "Detalle (opcional)" : "¿En qué fue?"}
+      {asksForPlace
+        ? "Lugar (o escribe otro)"
+        : isSimple
+          ? "Detalle (opcional)"
+          : kind === "income"
+            ? "Nota (opcional)"
+            : "¿En qué fue?"}
       <input
         className="field"
         type="text"
         placeholder={
           kind === "income"
-            ? "Ej. quincena de horno³"
+            ? "Ej. pago de horno³"
             : asksForPlace
               ? "Ej. Shake Shack"
               : "Ej. chilaquiles Super Salads"

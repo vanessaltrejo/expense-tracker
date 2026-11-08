@@ -47,7 +47,7 @@ export function getOpeningDates(
 /**
  * Every pocket is a ledger: money in minus money out. The card ledger goes negative
  * as charges come out of it, so its debt is the ledger with the sign flipped.
- * Dummy rows, future rows and rows older than the pocket's opening balance don't count.
+ * Previo rows, future rows and rows older than the pocket's opening balance don't count.
  */
 /** Growth of one peso in the cajita after `days` days, compounded daily like Nu does. */
 export function dailyGrowth(annualRate: number, days: number): number {

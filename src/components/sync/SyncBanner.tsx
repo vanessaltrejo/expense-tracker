@@ -16,6 +16,7 @@ export function SyncBanner() {
   if (state.status === "offline" && state.pending > 0) {
     message = `Sin internet · ${state.pending} ${state.pending === 1 ? "cambio" : "cambios"} por subir`;
   }
+  if (state.status === "layoutError") message = "Falta una columna en tu Sheets";
   if (state.status === "error") message = "No se pudo sincronizar con tu Sheets";
   if (!message) return null;
 

@@ -86,7 +86,7 @@ export function SimpleHome() {
   const openings = getOpeningDates(data.movements);
   const hasOpening = openings.bbva !== undefined && openings.efectivo !== undefined;
   const pending = data.movements.filter(
-    (movement) => movement.dataKind !== "dummy" && movement.category === PENDING_CATEGORY,
+    (movement) => movement.category === PENDING_CATEGORY,
   );
 
   return (

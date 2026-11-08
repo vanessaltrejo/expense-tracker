@@ -13,6 +13,11 @@ export function formatMoney(amount: Cents): string {
   return currencyFormatter.format(amount / 100);
 }
 
+/** An amount as it is typed into a field: 14399 becomes "143.99". */
+export function centsToInput(amount: Cents): string {
+  return (amount / 100).toFixed(2);
+}
+
 /** Reads what a person types ("1,000.50", "$99") and returns null if it is not an amount. */
 export function parseMoneyInput(rawValue: string): Cents | null {
   const cleaned = rawValue.replace(/[\s$,]/g, "");

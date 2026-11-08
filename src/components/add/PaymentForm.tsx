@@ -8,15 +8,17 @@ import { formatMoney, parseMoneyInput } from "@/domain/money";
 import { addMovement } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
 import { AmountField } from "../ui/AmountField";
+import { DateField } from "../ui/DateField";
 
 /** The card is always paid from the cajita, so the only thing to say is how much. */
 export function PaymentForm() {
   const { dashboard, today, runAction } = useFinance();
   const router = useRouter();
   const [amountText, setAmountText] = useState("");
+  const [date, setDate] = useState(today);
 
   const amount = parseMoneyInput(amountText);
-  const canSubmit = amount !== null && amount > 0;
+  const canSubmit = amount !== null && amount > 0 && Boolean(date);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -24,7 +26,7 @@ export function PaymentForm() {
 
     void runAction(`Pago de ${formatMoney(amount)} registrado`, () =>
       addMovement({
-        date: today,
+        date,
         type: "transfer",
         amount,
         from: "cajita",
@@ -49,6 +51,7 @@ export function PaymentForm() {
       <p className="amount text-sm text-ink-soft">
         Sale de tu {ENDPOINT_LABELS.cajita}, donde tienes {formatMoney(dashboard.balances.cajita)}.
       </p>
+      <DateField value={date} max={today} onChange={setDate} />
       <button type="submit" className="btn-primary amount" disabled={!canSubmit}>
         Pagar {canSubmit && amount !== null ? formatMoney(amount) : "tarjeta"}
       </button>
