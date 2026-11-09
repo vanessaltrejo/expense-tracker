@@ -9,6 +9,7 @@ import type { Movement, PocketId } from "@/domain/types";
 import { addMovement, deleteMovement } from "@/services/financeService";
 import { useFinance } from "../FinanceProvider";
 import { AmountField } from "../ui/AmountField";
+import { DateField } from "../ui/DateField";
 import { POCKET_STYLES } from "../ui/styles";
 
 const MOM: PocketId = "porCobrarMama";
@@ -58,6 +59,7 @@ export function MomDebtCard() {
   const [mode, setMode] = useState<Mode>(null);
   const [amountText, setAmountText] = useState("");
   const [note, setNote] = useState("");
+  const [date, setDate] = useState(today);
   const [pocket, setPocket] = useState<Source>("tarjetaNu");
 
   const total = dashboard.balances[MOM];
@@ -76,12 +78,13 @@ export function MomDebtCard() {
 
   const amount = parseMoneyInput(amountText);
   const canSave =
-    amount !== null && amount > 0 && (mode === "repayment" || note.trim() !== "");
+    amount !== null && amount > 0 && Boolean(date) && (mode === "repayment" || note.trim() !== "");
 
   const open = (next: Mode) => {
     setMode(next);
     setAmountText("");
     setNote("");
+    setDate(today);
     setPocket(next === "repayment" ? "banorte" : "tarjetaNu");
   };
 
@@ -95,7 +98,7 @@ export function MomDebtCard() {
       // The money already left (it is in the card debt), so only mom's side goes up.
       void runAction("Agregado a Deuda mami", () =>
         addMovement({
-          date: today,
+          date,
           type: "adjustment",
           amount,
           from: null,
@@ -111,7 +114,7 @@ export function MomDebtCard() {
     const source: PocketId = pocket === "registered" ? "efectivo" : pocket;
     void runAction(isNewDebt ? "Agregado a Deuda mami" : "Registrado lo que te regresó", () =>
       addMovement({
-        date: today,
+        date,
         // Paying something for mom isn't your spending: the money is owed back.
         type: "transfer",
         amount,
@@ -173,6 +176,7 @@ export function MomDebtCard() {
             onChange={setAmountText}
             autoFocus
           />
+          <DateField value={date} max={today} onChange={setDate} />
           <label className="field-label">
             {mode === "newDebt" ? "¿Qué fue?" : "Nota (opcional)"}
             <input
